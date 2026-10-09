@@ -23,9 +23,14 @@ struct lockedinmaxApp: App {
         }
     }()
 
+    init() {
+        Theme.configureTabBarAppearance()
+    }
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
+                .preferredColorScheme(.dark)
         }
         .modelContainer(sharedModelContainer)
     }
