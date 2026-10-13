@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 struct RootView: View {
@@ -45,5 +46,6 @@ struct RootView: View {
 
 #Preview {
     RootView()
+        .modelContainer(for: [Activity.self, Session.self, Metric.self, MetricEntry.self], inMemory: true)
         .onAppear { Theme.configureTabBarAppearance() }
 }

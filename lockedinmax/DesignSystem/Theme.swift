@@ -27,6 +27,17 @@ enum Theme {
     static let up = accent
     static let down = Color(hex: 0xFF5A5F)
 
+    static let activityColorPresets = [
+        "#CCFF00", "#63C7FF", "#C4A1FF", "#FFB86B",
+        "#FF83B5", "#64DDB0", "#FFE08A", "#A9BFFF"
+    ]
+
+    static func activityColor(_ hex: String) -> Color {
+        let digits = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
+        guard digits.count == 6, let value = UInt32(digits, radix: 16) else { return accent }
+        return Color(hex: value)
+    }
+
     enum Spacing {
         static let xs: CGFloat = 4
         static let sm: CGFloat = 8

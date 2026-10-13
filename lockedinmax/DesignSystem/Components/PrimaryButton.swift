@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct PrimaryButton: View {
+    @Environment(\.isEnabled) private var isEnabled
     let title: String
     let action: () -> Void
 
@@ -14,6 +15,7 @@ struct PrimaryButton: View {
                 .frame(minHeight: Theme.minimumTapHeight)
                 .padding(.vertical, Theme.Spacing.xs)
                 .background(Theme.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.medium))
+                .opacity(isEnabled ? 1 : 0.4)
         }
         .buttonStyle(.plain)
     }
