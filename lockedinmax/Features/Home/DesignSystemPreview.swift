@@ -1,5 +1,6 @@
 import SwiftUI
 
+#if DEBUG
 struct DesignSystemPreview: View {
     @State private var range: TimeRange = .week
     @State private var buttonTapped = false
@@ -98,3 +99,4 @@ struct DesignSystemPreview: View {
     .tint(Theme.accent)
     .preferredColorScheme(.dark)
 }
+#endif

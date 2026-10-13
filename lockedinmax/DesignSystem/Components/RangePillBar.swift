@@ -1,16 +1,5 @@
 import SwiftUI
 
-enum TimeRange: String, CaseIterable, Identifiable {
-    case day = "1D"
-    case week = "1W"
-    case month = "1M"
-    case quarter = "3M"
-    case year = "1Y"
-    case all = "ALL"
-
-    var id: String { rawValue }
-}
-
 struct RangePillBar<Selection>: View where Selection: CaseIterable & Hashable & RawRepresentable,
     Selection.RawValue == String {
     @Binding var selection: Selection

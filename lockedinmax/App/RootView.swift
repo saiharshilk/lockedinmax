@@ -2,29 +2,36 @@ import SwiftData
 import SwiftUI
 
 struct RootView: View {
+    @State private var appState = AppState()
+
     var body: some View {
-        TabView {
+        TabView(selection: $appState.selectedTab) {
             navigation {
-                DesignSystemPreview()
+                HomeView()
             }
+            .tag(AppTab.home)
             .tabItem { Label("Home", systemImage: "chart.line.uptrend.xyaxis") }
 
             navigation {
                 StatsView()
             }
+            .tag(AppTab.stats)
             .tabItem { Label("Stats", systemImage: "chart.bar.xaxis") }
 
             navigation {
                 LogView()
             }
+            .tag(AppTab.log)
             .tabItem { Label("Log", systemImage: "plus.circle") }
 
             navigation {
                 RecapView()
             }
+            .tag(AppTab.recap)
             .tabItem { Label("Recap", systemImage: "rectangle.portrait.on.rectangle.portrait") }
         }
         .tint(Theme.accent)
+        .environment(appState)
         .foregroundStyle(Theme.textPrimary)
         .background(Theme.background.ignoresSafeArea())
         .preferredColorScheme(.dark)
