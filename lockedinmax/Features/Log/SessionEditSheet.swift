@@ -44,7 +44,15 @@ struct SessionEditSheet: View {
                 get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
             )) { Button("OK", role: .cancel) {} } message: { Text(errorMessage ?? "") }
         }
+        .onAppear(perform: resetDraft)
         .tint(Theme.accent).preferredColorScheme(.dark)
+    }
+
+    private func resetDraft() {
+        hours = Formatters.hoursValue(session.hours)
+        date = session.date
+        note = session.note
+        photoData = session.photoData
     }
 
     private func save() {

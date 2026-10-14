@@ -38,6 +38,8 @@ Existing project settings still require adjustment in Xcode for Debug and Releas
 
 DONE: Task 4: Home Positions now show downsampled per-range sparklines, delta colors, tactile press feedback, and navigation to a live activity detail page. The detail page includes the shared scrubbable chart, all-time and active-day stats, best-day and streak calculations, grouped session history, edit/delete/photo flows, activity edit/delete, and a preselected Log-tab empty state. Shared hour and delta formatters provide consistent one-decimal hour values and signed percentages; sample data has a two-session Chess position alongside long photo-less histories.
 
+DONE: Task 4b audit: activity statistics are calculated by a pure all-time helper from live query-backed sessions, and session editing refreshes its draft on each sheet appearance before saving changes in place. The DEBUG stats preview covers same-day sessions, an inactive gap, yesterday, and today.
+
 NEXT: Task 5 Stats tab (daily/weekly/monthly breakdowns, score charts); Task 6 recap card export; Task 7 polish.
 
 ## Working rules

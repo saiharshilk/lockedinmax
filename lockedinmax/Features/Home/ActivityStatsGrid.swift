@@ -3,42 +3,28 @@ import SwiftUI
 struct ActivityStatsGrid: View {
     let sessions: [Session]
 
-    private var byDay: [Date: Double] {
-        Dictionary(grouping: sessions) { Calendar.current.startOfDay(for: $0.date) }
-            .mapValues { $0.reduce(0) { $0 + $1.hours } }
+    private var statistics: ActivityStats.Summary {
+        ActivityStats.calculate(sessions: sessions, now: .now)
     }
 
-    private var total: Double { sessions.reduce(0) { $0 + $1.hours } }
-    private var activeAverage: Double { byDay.isEmpty ? 0 : total / Double(byDay.count) }
-    private var bestDay: (date: Date, hours: Double)? {
-        byDay.max { $0.value < $1.value }.map { ($0.key, $0.value) }
+    private var bestDayDetail: String {
+        statistics.bestDay.map { ActivityStats.dayLabel($0.date) } ?? "—"
     }
-    private var streak: Int {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: .now)
-        let firstDay: Date
-        if byDay[today] != nil { firstDay = today }
-        else { firstDay = calendar.date(byAdding: .day, value: -1, to: today) ?? today }
-        guard byDay[firstDay] != nil else { return 0 }
-        var count = 0
-        var day = firstDay
-        while byDay[day] != nil {
-            count += 1
-            guard let previous = calendar.date(byAdding: .day, value: -1, to: day) else { break }
-            day = previous
-        }
-        return count
+
+    private var streakText: String {
+        let days = statistics.streakDays
+        return "\(days) \(days == 1 ? "day" : "days")"
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             SectionHeader(title: "STATS")
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Theme.Spacing.md) {
-                stat(title: "TOTAL", value: Formatters.hours(total))
-                stat(title: "AVG / ACTIVE DAY", value: Formatters.hours(activeAverage))
-                stat(title: "BEST DAY", value: bestDay.map { Formatters.hours($0.hours) } ?? Formatters.hours(0),
-                     detail: bestDay.map { $0.date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)).uppercased() })
-                stat(title: "STREAK", value: "\(streak) \(streak == 1 ? "day" : "days")")
+                stat(title: "TOTAL", value: Formatters.hours(statistics.totalHours))
+                stat(title: "AVG / ACTIVE DAY", value: Formatters.hours(statistics.averageHoursPerActiveDay))
+                stat(title: "BEST DAY", value: Formatters.hours(statistics.bestDay?.hours ?? 0),
+                     detail: bestDayDetail)
+                stat(title: "STREAK", value: streakText)
             }
         }
     }
@@ -58,6 +44,33 @@ struct ActivityStatsGrid: View {
     }
 }
 
-#Preview {
-    ActivityStatsGrid(sessions: []).padding(Theme.Spacing.lg).background(Theme.background)
+#Preview("Activity stats · sample week") {
+    ActivityStatsSamplePreview()
+}
+
+private struct ActivityStatsSamplePreview: View {
+    private let sessions: [Session]
+
+    init() {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: .now)
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: today) ?? today
+        let fourDaysAgo = calendar.date(byAdding: .day, value: -4, to: today) ?? today
+        sessions = [
+            Session(date: calendar.date(byAdding: .hour, value: 9, to: today) ?? today, hours: 1.0),
+            Session(date: calendar.date(byAdding: .hour, value: 14, to: today) ?? today, hours: 2.0),
+            Session(date: calendar.date(byAdding: .hour, value: 12, to: yesterday) ?? yesterday, hours: 1.5),
+            Session(date: calendar.date(byAdding: .hour, value: 12, to: fourDaysAgo) ?? fourDaysAgo, hours: 3.0)
+        ]
+        let stats = ActivityStats.calculate(sessions: sessions, now: .now, calendar: calendar)
+        assert(stats.totalHours == 7.5)
+        assert(stats.averageHoursPerActiveDay == 2.5)
+        assert(stats.bestDay?.hours == 3.0)
+        assert(stats.streakDays == 2)
+    }
+
+    var body: some View {
+        ActivityStatsGrid(sessions: sessions)
+            .padding(Theme.Spacing.lg).background(Theme.background)
+    }
 }
