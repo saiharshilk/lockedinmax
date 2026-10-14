@@ -41,6 +41,7 @@ enum Analytics {
         let buckets: [ChartPoint]
         let cumulative: [ChartPoint]
         let positions: [Position]
+        let activityBuckets: [UUID: [ChartPoint]]
     }
 
     private struct TimeWindow {
@@ -70,16 +71,20 @@ enum Analytics {
             deltaPercent: deltaPercent,
             buckets: points.buckets,
             cumulative: points.cumulative,
-            positions: positions(sessions: sessions, current: current, previous: previous)
+            positions: positions(sessions: sessions, current: current, previous: previous),
+            activityBuckets: activityBuckets(sessions: sessions, window: current, range: range,
+                                             calendar: calendar)
         )
     }
 
     static func deltaText(hours: Double, percent: Double?) -> String {
-        let magnitude = abs(hours).formatted(.number.precision(.fractionLength(0...1)))
-        guard let percent else { return "\(magnitude) hrs" }
-        let sign = percent > 0 ? "+" : ""
-        let percentText = percent.formatted(.number.precision(.fractionLength(0...1)))
-        return "\(magnitude) hrs (\(sign)\(percentText)%)"
+        Formatters.delta(hours: hours, percent: percent)
+    }
+
+    static func activitySummary(sessions: [Session], activityID: UUID, range: TimeRange,
+                                now: Date = .now, calendar: Calendar = .current) -> Summary {
+        summarize(sessions: sessions.filter { $0.activity?.id == activityID },
+                  range: range, now: now, calendar: calendar)
     }
 
     private static func window(for range: TimeRange, sessions: [Session], now: Date,
@@ -143,6 +148,39 @@ enum Analytics {
             segmentStart = interval.end
         }
         return (buckets, cumulative)
+    }
+
+    private static func activityBuckets(sessions: [Session], window: TimeWindow, range: TimeRange,
+                                        calendar: Calendar) -> [UUID: [ChartPoint]] {
+        let component = bucketComponent(for: range, window: window, calendar: calendar)
+        var result: [UUID: [ChartPoint]] = [:]
+        guard window.end > window.start else { return result }
+        let activityIDs = Set(sessions.compactMap { session -> UUID? in
+            guard session.date >= window.start, session.date <= window.end else { return nil }
+            return session.activity?.id
+        })
+        var segmentStart = calendar.dateInterval(of: component, for: window.start)?.start ?? window.start
+        while segmentStart < window.end {
+            guard let interval = calendar.dateInterval(of: component, for: segmentStart),
+                  interval.end > segmentStart else { break }
+            let start = max(segmentStart, window.start)
+            let end = min(interval.end, window.end)
+            if end > start {
+                var totals: [UUID: Double] = [:]
+                for session in sessions where session.date >= start
+                    && (session.date < end || (end == window.end && session.date <= end)) {
+                    guard let id = session.activity?.id else { continue }
+                    totals[id, default: 0] += session.hours
+                }
+                for id in activityIDs {
+                    var points = result[id] ?? []
+                    points.append(ChartPoint(id: points.count, date: start, value: totals[id] ?? 0))
+                    result[id] = points
+                }
+            }
+            segmentStart = interval.end
+        }
+        return result
     }
 
     private static func bucketComponent(for range: TimeRange, window: TimeWindow,

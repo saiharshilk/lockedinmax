@@ -12,16 +12,16 @@ struct HomeSummaryView: View {
                 .foregroundStyle(point == nil ? Theme.textTertiary : Theme.textSecondary)
 
             HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
-                Text(value.formatted(.number.precision(.fractionLength(1...1))))
+                Text(Formatters.hoursValue(value))
                     .typography(.heroNumber)
                     .foregroundStyle(Theme.textPrimary)
-                Text("hrs").typography(.body).foregroundStyle(Theme.textSecondary)
+                Text(Formatters.hoursUnit(value)).typography(.body).foregroundStyle(Theme.textSecondary)
             }
 
             if point == nil, range != .all, let delta = summary.deltaHours {
                 DeltaLabel(
                     value: delta,
-                    text: "\(Analytics.deltaText(hours: delta, percent: summary.deltaPercent)) vs previous"
+                    text: "\(Formatters.delta(hours: delta, percent: summary.deltaPercent)) vs previous"
                 )
             }
         }

@@ -4,6 +4,7 @@ import SwiftUI
 struct SessionLogForm: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \Activity.createdAt) private var activities: [Activity]
+    @Environment(AppState.self) private var appState
     @State private var activity: Activity?
     @State private var hours = ""
     @State private var date = Date.now
@@ -33,6 +34,9 @@ struct SessionLogForm: View {
                 .disabled(activity == nil || LogInput.positiveNumber(hours) == nil || isLoadingPhoto)
         }
         .sheet(isPresented: $showingNew) { NewActivitySheet { activity = $0 } }
+        .onAppear { applyPrefilledActivity() }
+        .onChange(of: appState.sessionActivityID) { _, _ in applyPrefilledActivity() }
+        .onChange(of: activities.map(\.id)) { _, _ in applyPrefilledActivity() }
         .sensoryFeedback(.impact(weight: .light), trigger: saveCount)
         .onChange(of: activities.map(\.id)) { _, ids in
             if let activity, !ids.contains(activity.id) { self.activity = nil }
@@ -40,6 +44,13 @@ struct SessionLogForm: View {
         .alert("Could not save session", isPresented: Binding(
             get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
         )) { Button("OK", role: .cancel) {} } message: { Text(errorMessage ?? "") }
+    }
+
+    private func applyPrefilledActivity() {
+        guard let id = appState.sessionActivityID,
+              let activity = activities.first(where: { $0.id == id }) else { return }
+        self.activity = activity
+        appState.sessionActivityID = nil
     }
 
     private func save() {

@@ -30,7 +30,9 @@ enum SampleData {
 
             if !zeroDays.contains(day) {
                 for (index, activity) in activities.enumerated() {
-                    if day > 1 && (day + index) % 7 == 0 { continue }
+                    // Chess intentionally has only two entries; other positions get a long, photo-less history.
+                    guard index != 2 || day == 0 || day == 8 else { continue }
+                    if index != 2, day > 1 && (day + index) % 7 == 0 { continue }
                     let hours = sessionHours(day: day, index: index, progress: progress)
                     let date = sessionDate(day: day, index: index, base: base, now: now, calendar: calendar)
                     context.insert(Session(date: date, hours: hours,

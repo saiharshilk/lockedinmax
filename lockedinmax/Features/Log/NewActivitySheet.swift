@@ -4,11 +4,20 @@ import SwiftUI
 struct NewActivitySheet: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
-    @State private var name = ""
-    @State private var colorHex = Theme.activityColorPresets[0]
-    @State private var iconName = "book"
+    @State private var name: String
+    @State private var colorHex: String
+    @State private var iconName: String
     @State private var errorMessage: String?
-    let onCreated: (Activity) -> Void
+    let existingActivity: Activity?
+    let onSaved: (Activity) -> Void
+
+    init(activity: Activity? = nil, onSaved: @escaping (Activity) -> Void) {
+        existingActivity = activity
+        self.onSaved = onSaved
+        _name = State(initialValue: activity?.name ?? "")
+        _colorHex = State(initialValue: activity?.colorHex ?? Theme.activityColorPresets[0])
+        _iconName = State(initialValue: activity?.iconName ?? "book")
+    }
     private let icons = ["book", "function", "laptopcomputer", "figure.walk", "crown", "bed.double",
                          "dumbbell", "music.note", "paintbrush", "brain", "pencil", "flame"]
 
@@ -50,14 +59,15 @@ struct NewActivitySheet: View {
                             .accessibilityAddTraits(icon == iconName ? .isSelected : [])
                         }
                     }
-                    PrimaryButton(title: "CREATE POSITION", action: save)
+                    PrimaryButton(title: existingActivity == nil ? "CREATE POSITION" : "SAVE CHANGES", action: save)
                         .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
                 .padding(Theme.Spacing.lg)
             }
             .buttonStyle(.plain)
             .background(Theme.background.ignoresSafeArea())
-            .navigationTitle("New Position").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(existingActivity == nil ? "New Position" : "Edit Position")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
             .alert("Could not save", isPresented: Binding(
                 get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
@@ -67,12 +77,20 @@ struct NewActivitySheet: View {
     }
 
     private func save() {
-        let activity = Activity(name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+        let activity: Activity
+        if let existingActivity {
+            activity = existingActivity
+            activity.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            activity.colorHex = colorHex
+            activity.iconName = iconName
+        } else {
+            activity = Activity(name: name.trimmingCharacters(in: .whitespacesAndNewlines),
                                 colorHex: colorHex, iconName: iconName)
-        context.insert(activity)
+            context.insert(activity)
+        }
         do {
             try context.save()
-            onCreated(activity)
+            onSaved(activity)
             dismiss()
         } catch {
             context.rollback()

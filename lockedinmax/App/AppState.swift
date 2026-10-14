@@ -1,4 +1,5 @@
 import Observation
+import Foundation
 
 enum AppTab: Int, CaseIterable, Hashable {
     case home
@@ -10,4 +11,5 @@ enum AppTab: Int, CaseIterable, Hashable {
 @Observable
 final class AppState {
     var selectedTab: AppTab = .home
+    var sessionActivityID: UUID?
 }

@@ -1,11 +1,6 @@
 import Charts
 import SwiftUI
 
-enum ChartMode: String, CaseIterable, Hashable {
-    case cumulative = "CUMULATIVE"
-    case perDay = "PER DAY"
-}
-
 struct HomeChartView: View {
     let summary: Analytics.Summary
     let range: TimeRange

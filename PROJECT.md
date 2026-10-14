@@ -36,7 +36,9 @@ Manual UI verification remains: chart scrubbing, range/mode interaction, visual 
 
 Existing project settings still require adjustment in Xcode for Debug and Release: minimum iOS 17.0, supported destinations iPhone only, and portrait orientation only. The template currently specifies iOS 27.0, extra platforms/device families, and landscape. project.pbxproj was not edited; build overrides do not persist these settings.
 
-NEXT: Task 4 activity rows with sparklines and detail page; Task 5 Stats; Task 6 recap card export; Task 7 polish.
+DONE: Task 4: Home Positions now show downsampled per-range sparklines, delta colors, tactile press feedback, and navigation to a live activity detail page. The detail page includes the shared scrubbable chart, all-time and active-day stats, best-day and streak calculations, grouped session history, edit/delete/photo flows, activity edit/delete, and a preselected Log-tab empty state. Shared hour and delta formatters provide consistent one-decimal hour values and signed percentages; sample data has a two-session Chess position alongside long photo-less histories.
+
+NEXT: Task 5 Stats tab (daily/weekly/monthly breakdowns, score charts); Task 6 recap card export; Task 7 polish.
 
 ## Working rules
 

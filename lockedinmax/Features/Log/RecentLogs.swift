@@ -90,7 +90,7 @@ struct RecentLogs: View {
         }
         var amount: String {
             switch self {
-            case .session(let s): "\(s.hours.formatted(.number.precision(.fractionLength(0...2)))) hrs"
+            case .session(let s): Formatters.hours(s.hours)
             case .entry(let e):
                 e.value.formatted(.number.precision(.fractionLength(0...2)))
                     + (e.metric?.unit.isEmpty == false ? " \(e.metric?.unit ?? "")" : "")
