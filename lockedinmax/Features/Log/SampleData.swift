@@ -17,7 +17,8 @@ enum SampleData {
             Activity(name: "Walks", colorHex: Theme.activityColorPresets[5], iconName: "figure.walk")
         ]
         activities[0].id = markerID
-        let metrics = [Metric(name: "Sleep Score", unit: "pts"), Metric(name: "ZetaMac", unit: "pts")]
+        let metrics = [Metric(name: "Sleep Score", unit: "pts"), Metric(name: "ZetaMac", unit: "pts"),
+                       Metric(name: "Chess Rating", unit: "")]
         let calendar = Calendar.current
         let start = calendar.startOfDay(for: now)
         let firstDay = calendar.date(byAdding: .day, value: -59, to: start) ?? start
@@ -39,14 +40,25 @@ enum SampleData {
                                            note: ["Problem sets and review", "Built a small feature",
                                                   "Tactics and a rapid game", "A walk to reset"][index],
                                            activity: activity))
+                    if (day == 4 || day == 18), index == 0 {
+                        context.insert(Session(date: date.addingTimeInterval(3_600), hours: 3.5,
+                                               note: "Extended focus block", activity: activity))
+                    }
                 }
             }
 
-            for (index, metric) in metrics.enumerated() {
-                let wave = sin(Double(day) * 1.3 + Double(index))
-                let value = index == 0 ? 78 + wave * 13 + progress * 4 : 28 + progress * 18 + wave * 6
-                let date = metricDate(day: day, index: index, base: base, now: now, calendar: calendar)
-                context.insert(MetricEntry(date: date, value: value.rounded(), metric: metric))
+            if day % 2 == 0 {
+                for (index, metric) in metrics.enumerated() {
+                    let wave = sin(Double(day) * 1.3 + Double(index))
+                    let value: Double
+                    switch index {
+                    case 0: value = min(95, max(60, 62 + progress * 30 + wave * 3))
+                    case 1: value = min(70, max(30, 32 + progress * 36 + wave * 4))
+                    default: value = min(950, max(800, 810 + progress * 135 + wave * 12))
+                    }
+                    let date = metricDate(day: day, index: index, base: base, now: now, calendar: calendar)
+                    context.insert(MetricEntry(date: date, value: value.rounded(), metric: metric))
+                }
             }
         }
         try context.save()

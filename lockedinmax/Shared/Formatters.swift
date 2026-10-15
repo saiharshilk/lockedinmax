@@ -23,4 +23,18 @@ enum Formatters {
         guard let change else { return hours(abs(value)) }
         return "\(hours(abs(value))) (\(percent(change)))"
     }
+
+    static func metricValue(_ value: Double) -> String {
+        value.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
+    }
+
+    static func metric(_ value: Double, unit: String = "") -> String {
+        let number = metricValue(value)
+        return unit.isEmpty ? number : "\(number) \(unit)"
+    }
+
+    static func metricDelta(_ change: Double) -> String {
+        let number = change.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
+        return "\(change >= 0 ? "+" : "")\(number)"
+    }
 }

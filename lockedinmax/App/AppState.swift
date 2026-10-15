@@ -12,4 +12,5 @@ enum AppTab: Int, CaseIterable, Hashable {
 final class AppState {
     var selectedTab: AppTab = .home
     var sessionActivityID: UUID?
+    var logScoreRequested = false
 }

@@ -20,11 +20,13 @@ App/ (entry, RootView with 4 tabs: Home, Stats, Log, Recap), DesignSystem/, Mode
 
 ## MVP scope
 
-(a) create activities and log sessions: DONE; (b) Home dashboard with big hours number, change vs previous period, scrubbable Swift Charts line chart, range pills; (c) activity list with sparklines and per-activity detail page; (d) score logging with screenshot: DONE (charts for scores come later); (e) recap card image export.
+(a) create activities and log sessions: DONE; (b) Home dashboard with big hours number, change vs previous period, scrubbable Swift Charts line chart, range pills; (c) activity list with sparklines and per-activity detail page; (d) score logging with screenshot and score charts: DONE; (e) recap card image export: NEXT.
+
+Metric performance treats higher values as better when coloring changes; no metric-specific direction is inferred.
 
 ## Current status
 
-DONE: Task 1: PROJECT.md, folders, design system, and 4-tab shell (Home, Stats, Log, Recap). Stats and Recap remain placeholders.
+DONE: Task 1: PROJECT.md, folders, design system, and 4-tab shell (Home, Stats, Log, Recap).
 
 DONE: Task 2: Activity, Session, Metric, and MetricEntry SwiftData models are registered in the app container; the template Item model was removed. Log supports session/score forms, activity/metric creation, PhotosPicker attachments, validation, saves, recent records, and DEBUG sample/clear tools.
 
@@ -40,7 +42,11 @@ DONE: Task 4: Home Positions now show downsampled per-range sparklines, delta co
 
 DONE: Task 4b audit: activity statistics are calculated by a pure all-time helper from live query-backed sessions, and session editing refreshes its draft on each sheet appearance before saving changes in place. The DEBUG stats preview covers same-day sessions, an inactive gap, yesterday, and today.
 
-NEXT: Task 5 Stats tab (daily/weekly/monthly breakdowns, score charts); Task 6 recap card export; Task 7 polish.
+DONE: Task 5: Stats includes DAY/WEEK/MONTH time breakdowns with previous-period comparisons, activity-stacked buckets, sorted breakdown, active-day/best-day/top-position insights, and a 12-week heatmap (levels use quartiles of non-zero daily hours). SCORES includes metric watchlist sparklines, range-based line charts and entry stats, screenshot history, edit/delete flows, and metric management. Score changes display higher-is-better coloring. DEBUG sample data includes three metrics with 30 entries each, 60 days of textured sessions, and deterministic analytics previews.
+
+Task 5 verification: xcodebuild succeeded for the iPhone 18 Pro simulator with iOS 17 deployment/iPhone-only/portrait overrides; a deterministic runtime assertion harness passed for time periods, breakdowns, insights, heatmap, metric summaries/formatting, and sample data. The app installed and launched successfully; a screenshot was saved to ignored `DerivedData/task5-stats-simulator.png`. Xcode emitted only the AppIntents metadata-skipped warning. Stats navigation, chart scrubbing, and haptics still need manual interactive review; no test target exists.
+
+NEXT: Task 6 recap card export; Task 7 polish.
 
 ## Working rules
 

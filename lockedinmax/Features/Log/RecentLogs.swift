@@ -92,8 +92,7 @@ struct RecentLogs: View {
             switch self {
             case .session(let s): Formatters.hours(s.hours)
             case .entry(let e):
-                e.value.formatted(.number.precision(.fractionLength(0...2)))
-                    + (e.metric?.unit.isEmpty == false ? " \(e.metric?.unit ?? "")" : "")
+                Formatters.metric(e.value, unit: e.metric?.unit ?? "")
             }
         }
     }
