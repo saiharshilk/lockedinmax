@@ -33,7 +33,7 @@ struct TimeSeriesChartCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
             hero
-            chart.frame(height: 180)
+            chart.frame(height: 190).clipped()
             RangePillBar(selection: Binding(
                 get: { range }, set: { value in
                     withAnimation(.easeInOut(duration: 0.2)) { range = value }

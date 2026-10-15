@@ -43,6 +43,12 @@ struct ActivityDetailView: View {
                                                onEdit: { activeSheet = .session(session) },
                                                onPhoto: { photoData = session.photoData })
                                 .listRowBackground(Theme.background)
+                                .swipeActions(edge: .leading) {
+                                    Button("Share recap", systemImage: "square.and.arrow.up") {
+                                        appState.sessionRecapID = session.id
+                                        appState.selectedTab = .recap
+                                    }.tint(Theme.accent)
+                                }
                                 .swipeActions {
                                     Button("Delete", role: .destructive) { delete(session) }
                                         .tint(Theme.down)

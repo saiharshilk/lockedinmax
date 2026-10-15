@@ -90,6 +90,8 @@ struct HomeChartView: View {
         .chartYScale(domain: 0...yMaximum)
         .animation(.easeInOut(duration: 0.2), value: range)
         .animation(.easeInOut(duration: 0.2), value: mode)
+        .frame(height: 190)
+        .clipped()
     }
 
     private func label(for date: Date) -> String {

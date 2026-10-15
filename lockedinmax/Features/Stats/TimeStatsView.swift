@@ -22,7 +22,7 @@ struct TimeStatsView: View {
         let current = StatsAnalytics.period(kind: kind, anchor: .now)
         return anchor >= current.start && anchor < current.end
     }
-    private var chartHeight: CGFloat { kind == .month ? 190 : 165 }
+    private let chartHeight: CGFloat = 190
     private var periodSegment: Binding<StatsPeriodKind> {
         Binding(get: { kind }, set: { kind = $0; anchor = .now; selectedBucket = nil; selectionTick += 1 })
     }
@@ -81,9 +81,7 @@ struct TimeStatsView: View {
     }
 
     private var stackedChart: some View {
-        VStack(spacing: Theme.Spacing.sm) {
-            if let selectedBucket { tooltip(selectedBucket) }
-            Chart {
+        Chart {
                 ForEach(summary.bucketValues) { item in
                     if activities.first(where: { $0.id == item.activityID }) != nil {
                         BarMark(x: .value("Bucket", item.bucket), y: .value("Hours", item.hours))
@@ -98,12 +96,22 @@ struct TimeStatsView: View {
             }
             .chartForegroundStyleScale(domain: activities.map { $0.id.uuidString },
                                        range: activities.map { Theme.activityColor($0.colorHex) })
-            .chartYScale(domain: 0...max(1, (summary.bucketValues.map(\.hours).max() ?? 0) * 1.15))
+            .chartYScale(domain: 0...max(1, (summary.bucketValues.reduce(into: [Int: Double]()) { totals, item in
+            totals[item.bucket, default: 0] += item.hours
+        }.values.max() ?? 0) * 1.15))
             .chartLegend(.hidden).chartYAxis(.hidden)
             .chartXAxis { axis }
             .chartXScale(domain: -0.5...Double(summary.period.bucketDates.count) - 0.5)
             .chartOverlay { proxy in
                 GeometryReader { geometry in
+                    if let selectedBucket, let plot = proxy.plotFrame.map({ geometry[$0] }) {
+                        let cardWidth = min(210, max(100, geometry.size.width - Theme.Spacing.lg))
+                        tooltip(selectedBucket)
+                            .frame(width: cardWidth)
+                            .position(x: min(max(plot.minX + (CGFloat(selectedBucket) + 0.5) * plot.width / CGFloat(max(summary.period.bucketDates.count, 1)), cardWidth / 2 + Theme.Spacing.xs), geometry.size.width - cardWidth / 2 - Theme.Spacing.xs),
+                                      y: min(max(plot.minY + 58, 54), max(54, plot.maxY - 54)))
+                            .allowsHitTesting(false)
+                    }
                     Rectangle().fill(.clear).contentShape(Rectangle())
                         .gesture(DragGesture(minimumDistance: 0).onChanged { value in
                             guard let plot = proxy.plotFrame.map({ geometry[$0] }) else { return }
@@ -116,7 +124,7 @@ struct TimeStatsView: View {
                 }
             }
             .frame(height: chartHeight)
-        }
+            .clipped()
     }
 
     @AxisContentBuilder private var axis: some AxisContent {
@@ -157,12 +165,17 @@ struct TimeStatsView: View {
     private func tooltip(_ bucket: Int) -> some View {
         let values = summary.bucketValues.filter { $0.bucket == bucket && $0.hours > 0 }
         let total = values.reduce(0) { $0 + $1.hours }
+        let visibleValues = Array(values.prefix(3))
         return VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
             Text(summary.period.bucketDates[safe: bucket].map { StatsFormat.day($0) } ?? "")
                 .typography(.sectionLabel).foregroundStyle(Theme.textTertiary)
             Text(Formatters.hours(total)).typography(.rowTitle).foregroundStyle(Theme.textPrimary)
-            ForEach(values) { value in
-                HStack { Text(value.activityName); Spacer(); Text(Formatters.hours(value.hours)) }
+            ForEach(visibleValues) { value in
+                HStack { Text(value.activityName).lineLimit(1); Spacer(); Text(Formatters.hours(value.hours)) }
+                    .typography(.caption).foregroundStyle(Theme.textSecondary)
+            }
+            if values.count > visibleValues.count {
+                Text("+ \(values.count - visibleValues.count) MORE POSITIONS")
                     .typography(.caption).foregroundStyle(Theme.textSecondary)
             }
         }.padding(Theme.Spacing.md).surfaceCard().frame(maxWidth: .infinity, alignment: .leading)

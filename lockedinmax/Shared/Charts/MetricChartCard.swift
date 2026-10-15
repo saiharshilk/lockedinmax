@@ -33,7 +33,7 @@ struct MetricChartCard: View {
                     DeltaLabel(value: change, text: "\(Formatters.metricDelta(change)) vs first entry")
                 }
             }
-            chart.frame(height: 210)
+            chart.frame(height: 210).clipped()
             RangePillBar(selection: $range)
         }
         .padding(Theme.Spacing.lg).surfaceCard()
@@ -62,11 +62,11 @@ struct MetricChartCard: View {
         .chartXSelection(value: $selectedDate)
         .chartYAxis(.hidden)
         .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 4)) { value in
+            AxisMarks(values: axisDates) { value in
                 AxisGridLine().foregroundStyle(.clear)
                 AxisTick().foregroundStyle(.clear)
                 if let date = value.as(Date.self) {
-                    AxisValueLabel { Text(date.formatted(.dateTime.month(.abbreviated).day())).typography(.caption).foregroundStyle(Theme.textSecondary) }
+                    AxisValueLabel { Text(axisLabel(date)).typography(.caption).foregroundStyle(Theme.textSecondary) }
                 }
             }
         }
@@ -81,8 +81,35 @@ struct MetricChartCard: View {
     private var lineColor: Color { (change ?? 0) >= 0 ? Theme.up : Theme.down }
     private var yDomain: ClosedRange<Double> {
         guard let minValue = points.map(\.value).min(), let maxValue = points.map(\.value).max() else { return 0...1 }
-        let padding = max((maxValue - minValue) * 0.1, max(abs(minValue), 1) * 0.05)
+        let spread = maxValue - minValue
+        let padding = spread == 0 ? max(abs(maxValue), 1) * 0.1 : max(spread * 0.1, max(abs(minValue), 1) * 0.05)
         return (minValue - padding)...(maxValue + padding)
+    }
+
+    private var usesTimeAxis: Bool {
+        guard let first = points.map(\.date).min(), let last = points.map(\.date).max() else { return false }
+        let firstDay = Calendar.current.startOfDay(for: first)
+        let lastDay = Calendar.current.startOfDay(for: last)
+        return (Calendar.current.dateComponents([.day], from: firstDay, to: lastDay).day ?? 0) <= 2
+    }
+
+    private var axisDates: [Date] {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = Calendar.current.timeZone
+        formatter.dateFormat = usesTimeAxis ? "h a" : "MMM d"
+        let unique = points.sorted { $0.date < $1.date }.reduce(into: [Date]()) { result, entry in
+            let label = formatter.string(from: entry.date)
+            if !result.contains(where: { formatter.string(from: $0) == label }) { result.append(entry.date) }
+        }
+        guard unique.count > 3 else { return unique }
+        return [unique[0], unique[unique.count / 2], unique[unique.count - 1]]
+    }
+
+    private func axisLabel(_ date: Date) -> String {
+        usesTimeAxis
+            ? date.formatted(.dateTime.hour(.defaultDigits(amPM: .abbreviated))).uppercased()
+            : date.formatted(.dateTime.month(.abbreviated).day()).uppercased()
     }
 
     private func selectNearest(to date: Date?) {

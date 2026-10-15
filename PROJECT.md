@@ -1,61 +1,61 @@
 # APP CONTEXT
 
-lockedinmax is an iOS app (SwiftUI + SwiftData, iPhone only, portrait, iOS 17+, no third-party packages, local storage only, no backend or accounts). It lets people track hours spent on activities (math, real analysis, personal projects, chess, walks) and scores (sleep score, ZetaMac score, chess rating), then shows them in a dark Gotham / NYC finance style modeled on a Robinhood-like portfolio UI: a big number, a scrubbable line chart, range pills (1D 1W 1M 3M 1Y ALL), and watchlist-style rows with sparklines. The goal is motivation: seeing your effort as a "portfolio of time" so you lock in and do more. It also generates shareable "recap cards" (like TikTok study-log slides: activity title, hours, one line of text, optional photo or screenshot). A community/friends feature may come much later; do not build it.
+lockedinmax is an iOS app (SwiftUI + SwiftData, iPhone only, portrait, iOS 17+, no third-party packages, local storage only, no backend or accounts). It lets people track hours spent on activities (math, real analysis, personal projects, chess, walks) and scores (sleep score, ZetaMac score, chess rating), then shows them in a dark Gotham / NYC finance style modeled on a Robinhood-like portfolio UI: a big number, a scrubbable line chart, range pills (1D 1W 1M 3M 1Y ALL), and watchlist-style rows with sparklines. The goal is motivation: seeing your effort as a "portfolio of time" so you lock in and do more. Users also share "recap cards" (like TikTok study-log slides: activity title, hours, one line of text, optional photo or screenshot). A community/friends feature may come much later; do not build it.
 
 Finance wording used in the UI: activities are "Positions", total hours are "Time Invested", the daily summary is "Market Close".
 
 Scores are logged by attaching a screenshot from the photo library and typing the number by hand. There is NO syncing with other apps and no HealthKit.
 
-## Data models (Models/, SwiftData, already implemented)
+## Design tokens
 
-Activity (id, name, colorHex, iconName, createdAt, sessions), Session (id, date, hours, note, photoData?, activity?), Metric (id, name, unit, createdAt, entries), MetricEntry (id, date, value, screenshotData?, metric?). The Log tab (Features/Log) already lets the user create activities/metrics and log sessions/scores, and has DEBUG-only "Load sample data" and "Clear all data" buttons.
+Use the tokens in `DesignSystem/Theme.swift`: background #1C180D, surface #26221A, hairline #3A3526, textPrimary #D4D0C9, textSecondary #8A8783, textTertiary #B4B1AB, accent #CCFF00 (brand, active states, and up), onAccent #1C180D, up = accent, down #FF5A5F. Fonts are system monospaced for numbers/labels and system serif semibold for titles. Spacing 4/8/12/16/24/32, radii 8/12/20. Components in DesignSystem/Components: PrimaryButton, RangePillBar, DeltaLabel, SectionHeader, SurfaceCard modifier, Sparkline.
 
-## Design tokens (in DesignSystem/Theme.swift; always use these, never hardcode colors or fonts)
+## Data models and shared logic
 
-background #1C180D, surface #26221A, hairline #3A3526, textPrimary #D4D0C9, textSecondary #8A8783, textTertiary #B4B1AB, accent #CCFF00 (brand, active states, "up"), onAccent #1C180D, up = accent, down #FF5A5F. Fonts: system monospaced for numbers/labels, system serif (semibold) for titles. Spacing 4/8/12/16/24/32, radii 8/12/20. Existing components in DesignSystem/Components: PrimaryButton, RangePillBar (cases 1D 1W 1M 3M 1Y ALL), DeltaLabel, SectionHeader, SurfaceCard modifier.
+Models in `Models/` use SwiftData: Activity (id, name, colorHex, iconName, createdAt, sessions), Session (id, date, hours, note, photoData?, activity?), Metric (id, name, unit, createdAt, entries), and MetricEntry (id, date, value, screenshotData?, metric?). Log supports activity/metric creation, session/score logging, recent-record swipe-to-delete, and DEBUG-only sample/clear controls.
 
-## Folder structure (inside the app source folder)
+`Shared/Analytics.swift` provides windows, previous windows, totals, deltas, buckets, cumulative/per-bucket series, and per-activity totals. `Shared/StatsAnalytics.swift` provides day/week/month periods, stacked buckets by activity, breakdown shares, insights, 12-week heatmap, and metric stats. `Shared/Formatters.swift` formats hours, signed percentages, deltas, and metric values. `ActivityStats` calculates TOTAL, AVG / ACTIVE DAY, BEST DAY, and STREAK.
 
-App/ (entry, RootView with 4 tabs: Home, Stats, Log, Recap), DesignSystem/, Models/, Features/Home, Features/Stats, Features/Log, Features/Recap, Shared/. Keep files under about 200 lines. Every view has a #Preview.
+`Shared/Charts/` contains the Home/activity time-series chart and metric chart. Each chart is constrained to a fixed height, clipped, and explicitly y-scaled. The Stats TIME stacked chart uses the same containment and keeps its scrubbing tooltip overlaid and clamped inside the chart frame. Metric axes limit their labels and use unique time-of-day labels for entries within two days.
+
+## Implemented screens
+
+- Home: hero number, delta, scrubbable chart, range pills, cumulative/per-day toggle, and POSITIONS rows with sparklines.
+- Activity detail: chart, stats, SESSIONS history with edit/delete, and a Share recap action for each session.
+- Stats: TIME (DAY/WEEK/MONTH with period navigator, stacked chart and tooltip, BREAKDOWN, INSIGHTS, 12-week heatmap) and SCORES (metric rows -> MetricDetailView with chart, stats, history, edit).
+- Log: session and score entry, activity/metric management, and recent logs.
+- Recap: SESSION and MARKET CLOSE modes, live fixed-ratio previews, selectable 4:5/9:16 output, optional session photo background, editable card-only caption, and ShareLink image export.
+
+## Folder structure
+
+Inside the app source folder: App/ (entry, RootView with Home, Stats, Log, Recap tabs and shared app state), DesignSystem/, Models/, Features/Home, Features/Stats, Features/Log, Features/Recap/Cards, Shared/. Keep files near 200 lines. Views include `#Preview` blocks.
 
 ## MVP scope
 
-(a) create activities and log sessions: DONE; (b) Home dashboard with big hours number, change vs previous period, scrubbable Swift Charts line chart, range pills; (c) activity list with sparklines and per-activity detail page; (d) score logging with screenshot and score charts: DONE; (e) recap card image export: NEXT.
+(a) activities + session logging: DONE; (b) Home: DONE; (c) activity detail: DONE; (d) score logging, score charts, and Stats: DONE; (e) recap card image export: DONE.
 
-Metric performance treats higher values as better when coloring changes; no metric-specific direction is inferred.
+Score changes use a higher-is-better assumption for coloring; lower-is-better support is not implemented.
 
 ## Current status
 
-DONE: Task 1: PROJECT.md, folders, design system, and 4-tab shell (Home, Stats, Log, Recap).
+DONE: Tasks 1 to 6.
 
-DONE: Task 2: Activity, Session, Metric, and MetricEntry SwiftData models are registered in the app container; the template Item model was removed. Log supports session/score forms, activity/metric creation, PhotosPicker attachments, validation, saves, recent records, and DEBUG sample/clear tools.
+Task 6 adds 360x450 and 360x640 Session and Market Close cards rendered at 3x, with dark/photo session backgrounds, deterministic skyline, header/ticker, activities and score summaries, live Recap controls and SwiftUI ShareLink export. Activity detail can route a selected session into Recap. DEBUG sample data now includes seven positions, very long text, photos, a high-hour day, and multiple same-day Sleep Score entries.
 
-DONE: Task 3: Home dashboard is live from SwiftData @Query sessions. It includes calendar-aware rolling/ALL summaries, previous-period hour and percent deltas, continuous hourly/daily/weekly/monthly buckets, cumulative/per-day chart modes, date scrubbing with selection haptics, range pills, sorted activity totals, empty-session CTA to Log, and a DEBUG-only Design System sheet. DEBUG sample sessions span 60 days with realistic times, 3 zero days, multiple sessions today and yesterday, and an increasing hours-per-session trend.
+Task 6 also contains fixed-height, clipped, explicitly scaled chart plots. Stats chart tooltip is overlaid and clamped within the plot frame; metric chart axis labels are limited and switch to distinct times for entries within two days. Chart overflow and duplicate same-day metric axis labels are resolved.
 
-Verification: xcodebuild succeeded for iPhone 18 Pro (`5D56424B-7E7E-4542-96A2-8323A47AB06C`, iOS 27 simulator) with iOS 17 deployment, iPhone-only, and portrait command-line overrides. The new source files were picked up automatically without project-file changes. Task 3 runtime assertions passed for 1D/1W/1M/1Y/ALL windows and buckets, previous-period calculations, zero previous-period handling, cumulative totals, sorted per-activity deltas, empty data, and sample-data dates/times/trend. The app installed and launched in the simulator; a screenshot was captured to ignored DerivedData. Xcode emitted only the AppIntents metadata-skipped warning because this app has no AppIntents dependency.
+Task 6 verification: an iPhone simulator build and sample-data render/export checks are required before considering this task verified. Manual interactive review of chart scrubbing, navigation, share sheet destinations, and haptics remains. There is no test target; local assertion harnesses can be kept in ignored DerivedData. Xcode may emit an AppIntents metadata warning because the app has no AppIntents dependency.
 
-Manual UI verification remains: chart scrubbing, range/mode interaction, visual layout, and physical haptics have not been exercised interactively. There is no test target; local runtime assertion harnesses are kept in ignored DerivedData/.
-
-Existing project settings still require adjustment in Xcode for Debug and Release: minimum iOS 17.0, supported destinations iPhone only, and portrait orientation only. The template currently specifies iOS 27.0, extra platforms/device families, and landscape. project.pbxproj was not edited; build overrides do not persist these settings.
-
-DONE: Task 4: Home Positions now show downsampled per-range sparklines, delta colors, tactile press feedback, and navigation to a live activity detail page. The detail page includes the shared scrubbable chart, all-time and active-day stats, best-day and streak calculations, grouped session history, edit/delete/photo flows, activity edit/delete, and a preselected Log-tab empty state. Shared hour and delta formatters provide consistent one-decimal hour values and signed percentages; sample data has a two-session Chess position alongside long photo-less histories.
-
-DONE: Task 4b audit: activity statistics are calculated by a pure all-time helper from live query-backed sessions, and session editing refreshes its draft on each sheet appearance before saving changes in place. The DEBUG stats preview covers same-day sessions, an inactive gap, yesterday, and today.
-
-DONE: Task 5: Stats includes DAY/WEEK/MONTH time breakdowns with previous-period comparisons, activity-stacked buckets, sorted breakdown, active-day/best-day/top-position insights, and a 12-week heatmap (levels use quartiles of non-zero daily hours). SCORES includes metric watchlist sparklines, range-based line charts and entry stats, screenshot history, edit/delete flows, and metric management. Score changes display higher-is-better coloring. DEBUG sample data includes three metrics with 30 entries each, 60 days of textured sessions, and deterministic analytics previews.
-
-Task 5 verification: xcodebuild succeeded for the iPhone 18 Pro simulator with iOS 17 deployment/iPhone-only/portrait overrides; a deterministic runtime assertion harness passed for time periods, breakdowns, insights, heatmap, metric summaries/formatting, and sample data. The app installed and launched successfully; a screenshot was saved to ignored `DerivedData/task5-stats-simulator.png`. Xcode emitted only the AppIntents metadata-skipped warning. Stats navigation, chart scrubbing, and haptics still need manual interactive review; no test target exists.
-
-NEXT: Task 6 recap card export; Task 7 polish.
+DONE: Task 7 remains NEXT (app icon, launch screen, empty states, custom fonts); lower-is-better metrics and a weekly recap are future options.
 
 ## Working rules
 
-- Read PROJECT.md first.
-- Make only the changes this task asks for.
-- Do not hand-edit project.pbxproj; if a new file isn't picked up by the build, stop and tell me.
-- Do not run git commit (I do).
-- Do not add Mac, iPad or visionOS support.
-- Build with xcodebuild for an available iPhone simulator (find one with `xcrun simctl list devices available`) and fix all errors before finishing.
+- Read PROJECT.md first. Make only requested changes.
+- Do not hand-edit project.pbxproj. Source files are automatically included through the synchronized project folder; if a new file is not picked up, stop.
+- Do not commit.
+- Do not add Mac, iPad, or visionOS support or change SwiftData models.
+- Do not request Photos write permission or edit Info.plist; use ShareLink for export.
+- Build with xcodebuild for an available iPhone simulator and fix build errors.
 
 ### Verified build command
 

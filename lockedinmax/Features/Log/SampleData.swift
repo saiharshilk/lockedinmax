@@ -1,6 +1,10 @@
 #if DEBUG
 import Foundation
 import SwiftData
+import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 enum SampleData {
     static let markerID = UUID(uuid: (0xCC, 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1))
@@ -14,7 +18,10 @@ enum SampleData {
             Activity(name: "Math", colorHex: Theme.activityColorPresets[0], iconName: "function"),
             Activity(name: "Personal Projects", colorHex: Theme.activityColorPresets[1], iconName: "laptopcomputer"),
             Activity(name: "Chess", colorHex: Theme.activityColorPresets[2], iconName: "crown"),
-            Activity(name: "Walks", colorHex: Theme.activityColorPresets[5], iconName: "figure.walk")
+            Activity(name: "Walks", colorHex: Theme.activityColorPresets[5], iconName: "figure.walk"),
+            Activity(name: "Extraordinary Long-Term Personal Research and Creative Projects", colorHex: Theme.activityColorPresets[6], iconName: "sparkles"),
+            Activity(name: "Language Study", colorHex: Theme.activityColorPresets[7], iconName: "character.book.closed"),
+            Activity(name: "Music Practice", colorHex: Theme.activityColorPresets[3], iconName: "music.note")
         ]
         activities[0].id = markerID
         let metrics = [Metric(name: "Sleep Score", unit: "pts"), Metric(name: "ZetaMac", unit: "pts"),
@@ -36,10 +43,18 @@ enum SampleData {
                     if index != 2, day > 1 && (day + index) % 7 == 0 { continue }
                     let hours = sessionHours(day: day, index: index, progress: progress)
                     let date = sessionDate(day: day, index: index, base: base, now: now, calendar: calendar)
-                    context.insert(Session(date: date, hours: hours,
-                                           note: ["Problem sets and review", "Built a small feature",
-                                                  "Tactics and a rapid game", "A walk to reset"][index],
-                                           activity: activity))
+                    let longSample = index == 4 && day == 2
+                    let note = longSample
+                        ? "A deliberately long recap note to confirm that text remains safely truncated and scaled within the card bounds without colliding with the footer ticker or the dramatic New York skyline silhouette."
+                        : ["Problem sets and review", "Built a small feature", "Tactics and a rapid game", "A walk to reset",
+                           "Research, planning, prototyping and long-form creative work", "Vocabulary and grammar drills", "Scales, rhythm and focused practice"][index]
+                    let photo = (index == 0 && day == 0) || (index == 1 && day == 1) ? gradientPhoto(for: index) : nil
+                    context.insert(Session(date: date, hours: hours, note: note,
+                                           photoData: photo, activity: activity))
+                    if index == 4 && day == 2 {
+                        context.insert(Session(date: date.addingTimeInterval(3_600), hours: 10.5,
+                                               note: "Ten-hour sample day for chart scale checks.", activity: activity))
+                    }
                     if (day == 4 || day == 18), index == 0 {
                         context.insert(Session(date: date.addingTimeInterval(3_600), hours: 3.5,
                                                note: "Extended focus block", activity: activity))
@@ -58,15 +73,37 @@ enum SampleData {
                     }
                     let date = metricDate(day: day, index: index, base: base, now: now, calendar: calendar)
                     context.insert(MetricEntry(date: date, value: value.rounded(), metric: metric))
+                    if index == 0 && day == 0 {
+                        context.insert(MetricEntry(date: date.addingTimeInterval(-1_800), value: 84, metric: metric))
+                        context.insert(MetricEntry(date: date.addingTimeInterval(-3_600), value: 87, metric: metric))
+                    }
                 }
             }
         }
         try context.save()
     }
 
+    private static func gradientPhoto(for index: Int) -> Data? {
+        #if os(iOS)
+        let size = CGSize(width: 480, height: 600)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        let colors: [UIColor] = index.isMultiple(of: 2)
+            ? [UIColor(Theme.accent), UIColor(Theme.surface)]
+            : [UIColor(Theme.down), UIColor(Theme.background)]
+        let image = renderer.image { context in
+            let cgColors = colors.map(\.cgColor) as CFArray
+            guard let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: cgColors, locations: [0, 1]) else { return }
+            context.cgContext.drawLinearGradient(gradient, start: .zero, end: CGPoint(x: size.width, y: size.height), options: [])
+        }
+        return image.jpegData(compressionQuality: 0.72)
+        #else
+        return nil
+        #endif
+    }
+
     private static func sessionHours(day: Int, index: Int, progress: Double) -> Double {
         let wave = sin(Double(day * 3 + index) * 0.7)
-        let typical = [1.6, 2.0, 0.75, 0.5][index]
+        let typical = [1.6, 2.0, 0.75, 0.5, 1.25, 0.75, 0.5][index]
         let hours = max(0.25, typical + wave * 0.35 + progress * 0.4)
         return (hours * 4).rounded() / 4
     }
