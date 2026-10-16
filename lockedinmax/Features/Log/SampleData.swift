@@ -7,13 +7,58 @@ import UIKit
 #endif
 
 enum SampleData {
-    static let markerID = UUID(uuid: (0xCC, 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1))
     private static let zeroDays: Set<Int> = [7, 23, 45]
+    private static let sampleSeed: UInt64 = 0x4C4F434B4544494E
 
-    static func load(into context: ModelContext, now: Date = .now) throws {
-        let marker = markerID
-        let existing = FetchDescriptor<Activity>(predicate: #Predicate { $0.id == marker })
-        guard try context.fetch(existing).isEmpty else { return }
+    static func load(into context: ModelContext, replacingExisting: Bool = false,
+                     now: Date = .now) throws -> SampleLoadTimings {
+        let totalStart = ProcessInfo.processInfo.systemUptime
+        let generationStart = totalStart
+        let generated = try makeSampleData(now: now)
+        let generationMilliseconds = (ProcessInfo.processInfo.systemUptime - generationStart) * 1_000
+        let insertionStart = ProcessInfo.processInfo.systemUptime
+        let oldSessions = try context.fetch(FetchDescriptor<Session>())
+        let oldEntries = try context.fetch(FetchDescriptor<MetricEntry>())
+        let oldActivities = try context.fetch(FetchDescriptor<Activity>())
+        let oldMetrics = try context.fetch(FetchDescriptor<Metric>())
+        let hasExistingData = !oldSessions.isEmpty || !oldEntries.isEmpty
+            || !oldActivities.isEmpty || !oldMetrics.isEmpty
+        guard !hasExistingData || replacingExisting else { throw SampleDataError.replacementRequired }
+
+        if replacingExisting {
+            oldSessions.forEach(context.delete)
+            oldEntries.forEach(context.delete)
+            oldActivities.forEach(context.delete)
+            oldMetrics.forEach(context.delete)
+        }
+
+        let activities = generated.activities
+        let metrics = generated.metrics
+        let sessions = generated.sessions
+        let entries = generated.entries
+        let firstDay = generated.firstDay
+        for activity in activities { activity.createdAt = firstDay; context.insert(activity) }
+        for metric in metrics { metric.createdAt = firstDay; context.insert(metric) }
+        sessions.forEach(context.insert)
+        entries.forEach(context.insert)
+        let insertionMilliseconds = (ProcessInfo.processInfo.systemUptime - insertionStart) * 1_000
+        let saveStart = ProcessInfo.processInfo.systemUptime
+        try context.save()
+        let saveMilliseconds = (ProcessInfo.processInfo.systemUptime - saveStart) * 1_000
+        return SampleLoadTimings(generationMilliseconds: generationMilliseconds,
+                                 insertionMilliseconds: insertionMilliseconds,
+                                 saveMilliseconds: saveMilliseconds)
+    }
+
+    private struct GeneratedSampleData {
+        let activities: [Activity]
+        let metrics: [Metric]
+        let sessions: [Session]
+        let entries: [MetricEntry]
+        let firstDay: Date
+    }
+
+    private static func makeSampleData(now: Date) throws -> GeneratedSampleData {
         let activities = [
             Activity(name: "Math", colorHex: Theme.activityColorPresets[0], iconName: "function"),
             Activity(name: "Personal Projects", colorHex: Theme.activityColorPresets[1], iconName: "laptopcomputer"),
@@ -23,46 +68,36 @@ enum SampleData {
             Activity(name: "Language Study", colorHex: Theme.activityColorPresets[7], iconName: "character.book.closed"),
             Activity(name: "Music Practice", colorHex: Theme.activityColorPresets[3], iconName: "music.note")
         ]
-        activities[0].id = markerID
         let metrics = [Metric(name: "Sleep Score", unit: "pts"), Metric(name: "ZetaMac", unit: "pts"),
                        Metric(name: "Chess Rating", unit: "")]
         let calendar = Calendar.current
         let start = calendar.startOfDay(for: now)
         let firstDay = calendar.date(byAdding: .day, value: -59, to: start) ?? start
-        for activity in activities { activity.createdAt = firstDay; context.insert(activity) }
-        for metric in metrics { metric.createdAt = firstDay; context.insert(metric) }
+        var sessions: [Session] = []
+        var entries: [MetricEntry] = []
+        let sharedPhoto = gradientPhoto()
+        let notes = ["Problem sets and review", "Built a small feature", "Tactics and a rapid game", "A walk to reset",
+                     "Research, planning and creative work", "Vocabulary and grammar drills", "Scales, rhythm and focused practice"]
 
         for day in 0..<60 {
             guard let base = calendar.date(byAdding: .day, value: -day, to: start) else { continue }
             let progress = Double(59 - day) / 59
 
             if !zeroDays.contains(day) {
-                for (index, activity) in activities.enumerated() {
-                    // Chess intentionally has only two entries; other positions get a long, photo-less history.
-                    guard index != 2 || day == 0 || day == 8 else { continue }
-                    if index != 2, day > 1 && (day + index) % 7 == 0 { continue }
-                    let hours = sessionHours(day: day, index: index, progress: progress)
+                for slot in 0..<3 {
+                    let index = (day + slot * 2) % activities.count
+                    let activity = activities[index]
                     let date = sessionDate(day: day, index: index, base: base, now: now, calendar: calendar)
-                    let longSample = index == 4 && day == 2
-                    let note = longSample
-                        ? "A deliberately long recap note to confirm that text remains safely truncated and scaled within the card bounds without colliding with the footer ticker or the dramatic New York skyline silhouette."
-                        : ["Problem sets and review", "Built a small feature", "Tactics and a rapid game", "A walk to reset",
-                           "Research, planning, prototyping and long-form creative work", "Vocabulary and grammar drills", "Scales, rhythm and focused practice"][index]
-                    let photo = (index == 0 && day == 0) || (index == 1 && day == 1) ? gradientPhoto(for: index) : nil
-                    context.insert(Session(date: date, hours: hours, note: note,
-                                           photoData: photo, activity: activity))
-                    if index == 4 && day == 2 {
-                        context.insert(Session(date: date.addingTimeInterval(3_600), hours: 10.5,
-                                               note: "Ten-hour sample day for chart scale checks.", activity: activity))
-                    }
-                    if (day == 4 || day == 18), index == 0 {
-                        context.insert(Session(date: date.addingTimeInterval(3_600), hours: 3.5,
-                                               note: "Extended focus block", activity: activity))
-                    }
+                    let photo = day < 4 && slot == day % 3 ? sharedPhoto : nil
+                    let note = day == 2 && slot == 0
+                        ? "A deliberately longer recap note to check that text stays safely within the card layout."
+                        : notes[index]
+                    sessions.append(Session(date: date, hours: sessionHours(day: day, index: index),
+                                            note: note, photoData: photo, activity: activity))
                 }
             }
 
-            if day % 2 == 0 {
+            if day < 50 && day.isMultiple(of: 2) {
                 for (index, metric) in metrics.enumerated() {
                     let wave = sin(Double(day) * 1.3 + Double(index))
                     let value: Double
@@ -72,39 +107,38 @@ enum SampleData {
                     default: value = min(950, max(800, 810 + progress * 135 + wave * 12))
                     }
                     let date = metricDate(day: day, index: index, base: base, now: now, calendar: calendar)
-                    context.insert(MetricEntry(date: date, value: value.rounded(), metric: metric))
-                    if index == 0 && day == 0 {
-                        context.insert(MetricEntry(date: date.addingTimeInterval(-1_800), value: 84, metric: metric))
-                        context.insert(MetricEntry(date: date.addingTimeInterval(-3_600), value: 87, metric: metric))
-                    }
+                    entries.append(MetricEntry(date: date, value: value.rounded(), metric: metric))
                 }
             }
         }
-        try context.save()
+        return GeneratedSampleData(activities: activities, metrics: metrics, sessions: sessions,
+                                   entries: entries, firstDay: firstDay)
     }
 
-    private static func gradientPhoto(for index: Int) -> Data? {
+    private static func gradientPhoto() -> Data? {
         #if os(iOS)
-        let size = CGSize(width: 480, height: 600)
+        let size = CGSize(width: 320, height: 400)
         let renderer = UIGraphicsImageRenderer(size: size)
-        let colors: [UIColor] = index.isMultiple(of: 2)
-            ? [UIColor(Theme.accent), UIColor(Theme.surface)]
-            : [UIColor(Theme.down), UIColor(Theme.background)]
         let image = renderer.image { context in
-            let cgColors = colors.map(\.cgColor) as CFArray
-            guard let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: cgColors, locations: [0, 1]) else { return }
-            context.cgContext.drawLinearGradient(gradient, start: .zero, end: CGPoint(x: size.width, y: size.height), options: [])
+            let colors = [UIColor(Theme.accent).cgColor, UIColor(Theme.surface).cgColor] as CFArray
+            guard let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1]) else { return }
+            context.cgContext.drawLinearGradient(gradient, start: .zero,
+                                                 end: CGPoint(x: size.width, y: size.height), options: [])
         }
-        return image.jpegData(compressionQuality: 0.72)
+        return image.jpegData(compressionQuality: 0.65)
         #else
         return nil
         #endif
     }
 
-    private static func sessionHours(day: Int, index: Int, progress: Double) -> Double {
-        let wave = sin(Double(day * 3 + index) * 0.7)
+    private static func sessionHours(day: Int, index: Int) -> Double {
+        var value = sampleSeed &+ UInt64(day * 7 + index + 1)
+        value = (value ^ (value >> 30)) &* 0xBF58476D1CE4E5B9
+        value = (value ^ (value >> 27)) &* 0x94D049BB133111EB
+        value ^= value >> 31
+        let fraction = Double(value >> 11) / Double(1 << 53)
         let typical = [1.6, 2.0, 0.75, 0.5, 1.25, 0.75, 0.5][index]
-        let hours = max(0.25, typical + wave * 0.35 + progress * 0.4)
+        let hours = min(12, max(0.25, typical + fraction * 1.5 - 0.5))
         return (hours * 4).rounded() / 4
     }
 
@@ -130,6 +164,54 @@ enum SampleData {
         return max(earliest, now.addingTimeInterval(-Double(index + 1) * 60))
     }
 
+    @MainActor
+    static func runSampleDataSelfCheck() -> String {
+        do {
+            let schema = Schema([Activity.self, Session.self, Metric.self, MetricEntry.self])
+            let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            let container = try ModelContainer(for: schema, configurations: [configuration])
+            let context = ModelContext(container)
+            context.autosaveEnabled = false
+
+            let firstTimings = try load(into: context, now: Date(timeIntervalSince1970: 1_800_000_000))
+            let first = try counts(in: context)
+            let badHours = try context.fetch(FetchDescriptor<Session>()).filter {
+                !$0.hours.isFinite || !(0.25...12).contains($0.hours)
+            }.count
+            guard first.sessions <= 260, badHours == 0, first.activities == 7,
+                  first.metrics == 3, (60...90).contains(first.entries) else {
+                return "FAIL: first run \(first); invalid hours=\(badHours)"
+            }
+
+            let replacementTimings = try load(into: context, replacingExisting: true,
+                                               now: Date(timeIntervalSince1970: 1_800_000_000))
+            let second = try counts(in: context)
+            guard second == first else {
+                return "FAIL: first run \(first); replace run \(second)"
+            }
+            return "PASS: first run \(first); replace run \(second); invalid hours=0; first load \(firstTimings); replace load \(replacementTimings)"
+        } catch {
+            return "FAIL: sample generator check threw \(error.localizedDescription)"
+        }
+    }
+
+    private struct Counts: Equatable, CustomStringConvertible {
+        let sessions: Int
+        let activities: Int
+        let metrics: Int
+        let entries: Int
+        var description: String {
+            "sessions=\(sessions), activities=\(activities), metrics=\(metrics), entries=\(entries)"
+        }
+    }
+
+    private static func counts(in context: ModelContext) throws -> Counts {
+        Counts(sessions: try context.fetchCount(FetchDescriptor<Session>()),
+               activities: try context.fetchCount(FetchDescriptor<Activity>()),
+               metrics: try context.fetchCount(FetchDescriptor<Metric>()),
+               entries: try context.fetchCount(FetchDescriptor<MetricEntry>()))
+    }
+
     static func clear(_ context: ModelContext) throws {
         for session in try context.fetch(FetchDescriptor<Session>()) { context.delete(session) }
         for entry in try context.fetch(FetchDescriptor<MetricEntry>()) { context.delete(entry) }
@@ -137,5 +219,9 @@ enum SampleData {
         for metric in try context.fetch(FetchDescriptor<Metric>()) { context.delete(metric) }
         try context.save()
     }
+}
+
+enum SampleDataError: Error {
+    case replacementRequired
 }
 #endif

@@ -15,9 +15,11 @@ enum ActivityStats {
     }
 
     static func calculate(sessions: [Session], now: Date, calendar: Calendar = .current) -> Summary {
-        let hoursByDay = Dictionary(grouping: sessions) { calendar.startOfDay(for: $0.date) }
-            .mapValues { $0.reduce(0) { $0 + $1.hours } }
-        let total = sessions.reduce(0) { $0 + $1.hours }
+        Analytics.recordRecompute()
+        let validSessions = sessions.filter { $0.hours.isFinite }
+        let hoursByDay = Dictionary(grouping: validSessions) { calendar.startOfDay(for: $0.date) }
+            .mapValues { $0.reduce(0) { $0 + Analytics.boundedHours($1.hours) } }
+        let total = validSessions.reduce(0) { $0 + Analytics.boundedHours($1.hours) }
         let average = hoursByDay.isEmpty ? 0 : total / Double(hoursByDay.count)
         let best = hoursByDay.reduce(into: nil as Day?) { current, entry in
             let candidate = Day(date: entry.key, hours: entry.value)
@@ -32,7 +34,9 @@ enum ActivityStats {
         let yesterday = calendar.date(byAdding: .day, value: -1, to: today) ?? today
         var day = hoursByDay[today] != nil ? today : yesterday
         var streak = 0
+        var loopGuard = LoopGuard("ActivityStats.calculate.streak")
         while hoursByDay[day] != nil {
+            guard loopGuard.next() else { break }
             streak += 1
             guard let previous = calendar.date(byAdding: .day, value: -1, to: day) else { break }
             day = previous

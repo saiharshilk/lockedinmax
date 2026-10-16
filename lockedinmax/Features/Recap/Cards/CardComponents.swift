@@ -56,19 +56,18 @@ struct CardHeader: View {
 }
 
 struct CardFooterTicker: View {
-    let sessions: [Session]
-    let previousSessions: [Session]
-    let scores: [MetricEntry]
+    let sessions: [RecapSessionValue]
+    let previousSessions: [RecapSessionValue]
+    let scores: [RecapScoreValue]
 
     private var activities: [(name: String, hours: Double, previous: Double)] {
-        let totals = Dictionary(grouping: sessions.compactMap { session -> (Activity, Double)? in
-            guard let activity = session.activity else { return nil }
-            return (activity, session.hours)
-        }, by: { $0.0.id })
+        let totals = Dictionary(grouping: sessions.filter { $0.activityID != nil && $0.hours.isFinite },
+                                by: { $0.activityID! })
         return totals.values.compactMap { values in
-            guard let activity = values.first?.0 else { return nil }
-            let prior = previousSessions.filter { $0.activity?.id == activity.id }.reduce(0) { $0 + $1.hours }
-            return (activity.name, values.reduce(0) { $0 + $1.1 }, prior)
+            guard let activity = values.first else { return nil }
+            let prior = previousSessions.filter { $0.activityID == activity.activityID }
+                .reduce(0) { $0 + Analytics.boundedHours($1.hours) }
+            return (activity.activityName, values.reduce(0) { $0 + Analytics.boundedHours($1.hours) }, prior)
         }.sorted { $0.hours > $1.hours }.prefix(3).map { $0 }
     }
 
@@ -83,7 +82,7 @@ struct CardFooterTicker: View {
             }
             ForEach(scores.sorted { $0.date > $1.date }.prefix(2)) { entry in
                 HStack(spacing: Theme.Spacing.xs) {
-                    Text((entry.metric?.name ?? "SCORE").uppercased()).foregroundStyle(Theme.textSecondary)
+                    Text(entry.metricName.uppercased()).foregroundStyle(Theme.textSecondary)
                     Text(Formatters.metricValue(entry.value)).foregroundStyle(Theme.textPrimary)
                 }
             }

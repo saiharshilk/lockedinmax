@@ -26,13 +26,16 @@ struct SessionEditSheet: View {
                 VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                     Text("TIME INVESTED · HOURS").typography(.sectionLabel).foregroundStyle(Theme.textTertiary)
                     TextField("0.0", text: $hours).keyboardType(.decimalPad).logInputStyle()
+                    if LogInput.exceedsSessionLimit(hours) {
+                        Text("Max 24 hours per session").typography(.caption).foregroundStyle(Theme.down)
+                    }
                     DatePicker("Date", selection: $date, displayedComponents: [.date, .hourAndMinute])
                         .logInputStyle()
                     TextField("Note (optional)", text: $note, axis: .vertical).logInputStyle()
                     PhotoInput(title: "Add photo (optional)", large: false, data: $photoData,
                                isLoading: $isLoadingPhoto)
                     PrimaryButton(title: "SAVE CHANGES", action: save)
-                        .disabled(LogInput.positiveNumber(hours) == nil || isLoadingPhoto)
+                        .disabled(LogInput.sessionHours(hours) == nil || isLoadingPhoto)
                 }
                 .padding(Theme.Spacing.lg)
             }
@@ -56,7 +59,7 @@ struct SessionEditSheet: View {
     }
 
     private func save() {
-        guard let value = LogInput.positiveNumber(hours) else { return }
+        guard let value = LogInput.sessionHours(hours) else { return }
         session.hours = value
         session.date = date
         session.note = note

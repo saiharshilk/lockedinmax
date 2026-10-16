@@ -15,6 +15,16 @@ enum LogInput {
               number.isFinite, number > 0 else { return nil }
         return number
     }
+
+    static func sessionHours(_ text: String) -> Double? {
+        guard let value = positiveNumber(text), value <= 24 else { return nil }
+        return value
+    }
+
+    static func exceedsSessionLimit(_ text: String) -> Bool {
+        guard let value = positiveNumber(text) else { return false }
+        return value > 24
+    }
 }
 
 extension View {

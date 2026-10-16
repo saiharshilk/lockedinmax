@@ -29,6 +29,25 @@ struct TimeStatsView: View {
 
     var body: some View {
         Group {
+#if DEBUG
+            if DebugWorkState.isSeeding {
+                ProgressView("Loading sample data...").tint(Theme.accent)
+                    .frame(maxWidth: .infinity, minHeight: 160)
+            } else {
+                statsContent
+            }
+#else
+            statsContent
+#endif
+        }
+        .sensoryFeedback(.selection, trigger: selectionTick)
+#if DEBUG
+        .onChange(of: appState.sampleDataRefreshVersion) { _, _ in }
+#endif
+    }
+
+    private var statsContent: some View {
+        Group {
             if sessions.isEmpty {
                 emptyState
             } else {
@@ -46,7 +65,6 @@ struct TimeStatsView: View {
                 .animation(.easeInOut(duration: 0.2), value: anchor)
             }
         }
-        .sensoryFeedback(.selection, trigger: selectionTick)
     }
 
     private var navigator: some View {

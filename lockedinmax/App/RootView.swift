@@ -3,6 +3,9 @@ import SwiftUI
 
 struct RootView: View {
     @State private var appState = AppState()
+#if DEBUG
+    @State private var didRunSampleDataSelfCheck = false
+#endif
 
     var body: some View {
         TabView(selection: $appState.selectedTab) {
@@ -35,6 +38,18 @@ struct RootView: View {
         .foregroundStyle(Theme.textPrimary)
         .background(Theme.background.ignoresSafeArea())
         .preferredColorScheme(.dark)
+#if DEBUG
+        .task {
+            let arguments = ProcessInfo.processInfo.arguments
+            if arguments.contains("--sample-data-self-check") && !didRunSampleDataSelfCheck {
+                didRunSampleDataSelfCheck = true
+                NSLog("[SampleDataSelfCheck] %@", SampleData.runSampleDataSelfCheck())
+            }
+            if arguments.contains("--analytics-sweep") {
+                NSLog("[AnalyticsSweepArgument] %@", AnalyticsSweep.runAnalyticsSweep().description)
+            }
+        }
+#endif
     }
 
     private func navigation<Content: View>(@ViewBuilder content: () -> Content) -> some View {

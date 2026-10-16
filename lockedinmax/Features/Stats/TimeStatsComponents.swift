@@ -67,8 +67,12 @@ struct TimeStatsInsights: View {
 struct ConsistencyHeatmap: View {
     let sessions: [Session]
     @State private var selected: StatsAnalytics.HeatDay?
+    @State private var days: [StatsAnalytics.HeatDay] = []
     private let labels = ["M", "", "W", "", "F", "", ""]
-    private var days: [StatsAnalytics.HeatDay] { StatsAnalytics.heatmap(sessions: sessions, today: .now) }
+
+    init(sessions: [Session]) {
+        self.sessions = sessions
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
@@ -90,6 +94,10 @@ struct ConsistencyHeatmap: View {
                 Text("\(StatsFormat.day(selected.date)) · \(Formatters.hours(selected.hours))")
                     .typography(.caption).foregroundStyle(Theme.textSecondary)
             }
+        }
+        .task(id: "\(sessions.count)-\(DebugWorkState.generation)") {
+            guard !DebugWorkState.isSeeding else { return }
+            days = StatsAnalytics.heatmap(sessions: sessions, today: .now)
         }
     }
 

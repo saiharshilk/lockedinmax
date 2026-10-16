@@ -13,6 +13,28 @@ enum TimeRange: String, CaseIterable, Identifiable {
 }
 
 enum Analytics {
+#if DEBUG
+    private(set) static var debugRecomputeCount = 0
+    private(set) static var debugHomeRecomputeCount = 0
+#endif
+
+    static func recordRecompute() {
+#if DEBUG
+        debugRecomputeCount += 1
+#endif
+    }
+
+    static func boundedHours(_ value: Double) -> Double {
+        guard value.isFinite else { return 0 }
+        return min(24, max(0, value))
+    }
+
+    static func percentChange(current: Double, previous: Double) -> Double? {
+        guard previous.isFinite, previous > 0, current.isFinite else { return nil }
+        let result = (current - previous) / previous * 100
+        return result.isFinite ? result : nil
+    }
+
     struct ChartPoint: Identifiable {
         let id: Int
         let date: Date
@@ -51,14 +73,20 @@ enum Analytics {
 
     static func summarize(sessions: [Session], range: TimeRange, now: Date = .now,
                           calendar: Calendar = .current) -> Summary {
+        recordRecompute()
+#if DEBUG
+        if !DebugWorkState.isSeeding { debugHomeRecomputeCount += 1 }
+        if DebugWorkState.isSeeding {
+            return Summary(windowStart: now, windowEnd: now, previousStart: nil, previousEnd: nil,
+                           currentHours: 0, previousHours: nil, deltaHours: nil, deltaPercent: nil,
+                           buckets: [], cumulative: [], positions: [], activityBuckets: [:])
+        }
+#endif
         let (current, previous) = window(for: range, sessions: sessions, now: now, calendar: calendar)
         let currentHours = total(sessions, from: current.start, to: current.end, includeEnd: true)
         let previousHours = previous.map { total(sessions, from: $0.start, to: $0.end, includeEnd: false) }
         let deltaHours = previousHours.map { currentHours - $0 }
-        let deltaPercent: Double? = previousHours.flatMap { previous in
-            guard previous > 0 else { return nil }
-            return (currentHours - previous) / previous * 100
-        }
+        let deltaPercent = previousHours.flatMap { percentChange(current: currentHours, previous: $0) }
         let points = chartPoints(sessions: sessions, window: current, range: range, calendar: calendar)
         return Summary(
             windowStart: current.start,
@@ -107,7 +135,7 @@ enum Analytics {
             let previousStart = calendar.date(byAdding: .day, value: -days, to: start) ?? start
             return (TimeWindow(start: start, end: now), TimeWindow(start: previousStart, end: start))
         case .all:
-            let earliest = sessions.map(\.date).min()
+            let earliest = sessions.filter { $0.hours.isFinite }.map(\.date).min()
             let start = earliest.map { min($0, now) } ?? now
             return (TimeWindow(start: start, end: now), nil)
         }
@@ -116,14 +144,17 @@ enum Analytics {
     private static func total(_ sessions: [Session], from start: Date, to end: Date,
                               includeEnd: Bool) -> Double {
         sessions.reduce(0) { total, session in
-            guard session.date >= start,
+            guard session.hours.isFinite, session.date >= start,
                   includeEnd ? session.date <= end : session.date < end else { return total }
-            return total + session.hours
+            return total + boundedHours(session.hours)
         }
     }
 
     private static func chartPoints(sessions: [Session], window: TimeWindow, range: TimeRange,
                                     calendar: Calendar) -> (buckets: [ChartPoint], cumulative: [ChartPoint]) {
+#if DEBUG
+        guard !DebugWorkState.isSeeding else { return ([], []) }
+#endif
         guard window.end > window.start else {
             let point = ChartPoint(id: 0, date: window.start, value: 0)
             return ([point], [point])
@@ -133,9 +164,11 @@ enum Analytics {
         var cumulative = [ChartPoint(id: 0, date: window.start, value: 0)]
         var running = 0.0
         var segmentStart = calendar.dateInterval(of: component, for: window.start)?.start ?? window.start
+        var loopGuard = LoopGuard("Analytics.chartPoints")
 
         while segmentStart < window.end {
-            guard let interval = calendar.dateInterval(of: component, for: segmentStart),
+            guard loopGuard.next(),
+                  let interval = calendar.dateInterval(of: component, for: segmentStart),
                   interval.end > segmentStart else { break }
             let start = max(segmentStart, window.start)
             let end = min(interval.end, window.end)
@@ -152,25 +185,30 @@ enum Analytics {
 
     private static func activityBuckets(sessions: [Session], window: TimeWindow, range: TimeRange,
                                         calendar: Calendar) -> [UUID: [ChartPoint]] {
+#if DEBUG
+        guard !DebugWorkState.isSeeding else { return [:] }
+#endif
         let component = bucketComponent(for: range, window: window, calendar: calendar)
         var result: [UUID: [ChartPoint]] = [:]
         guard window.end > window.start else { return result }
         let activityIDs = Set(sessions.compactMap { session -> UUID? in
-            guard session.date >= window.start, session.date <= window.end else { return nil }
+            guard session.hours.isFinite, session.date >= window.start, session.date <= window.end else { return nil }
             return session.activity?.id
         })
         var segmentStart = calendar.dateInterval(of: component, for: window.start)?.start ?? window.start
+        var loopGuard = LoopGuard("Analytics.activityBuckets")
         while segmentStart < window.end {
-            guard let interval = calendar.dateInterval(of: component, for: segmentStart),
+            guard loopGuard.next(),
+                  let interval = calendar.dateInterval(of: component, for: segmentStart),
                   interval.end > segmentStart else { break }
             let start = max(segmentStart, window.start)
             let end = min(interval.end, window.end)
             if end > start {
                 var totals: [UUID: Double] = [:]
-                for session in sessions where session.date >= start
+                for session in sessions where session.hours.isFinite && session.date >= start
                     && (session.date < end || (end == window.end && session.date <= end)) {
                     guard let id = session.activity?.id else { continue }
-                    totals[id, default: 0] += session.hours
+                    totals[id, default: 0] += boundedHours(session.hours)
                 }
                 for id in activityIDs {
                     var points = result[id] ?? []
@@ -205,13 +243,14 @@ enum Analytics {
         var activities: [UUID: Activity] = [:]
 
         for session in sessions {
-            guard let activity = session.activity else { continue }
+            guard session.hours.isFinite, let activity = session.activity else { continue }
+            let hours = boundedHours(session.hours)
             activities[activity.id] = activity
             if session.date >= current.start && session.date <= current.end {
-                currentHours[activity.id, default: 0] += session.hours
+                currentHours[activity.id, default: 0] += hours
             }
             if let previous, session.date >= previous.start, session.date < previous.end {
-                previousHours[activity.id, default: 0] += session.hours
+                previousHours[activity.id, default: 0] += hours
             }
         }
 
@@ -219,10 +258,7 @@ enum Analytics {
             guard hours > 0, let activity = activities[id] else { return nil }
             let prior: Double? = previous == nil ? nil : (previousHours[id] ?? 0)
             let delta = prior.map { hours - $0 }
-            let percent = prior.flatMap { prior -> Double? in
-                guard prior > 0 else { return nil }
-                return (hours - prior) / prior * 100
-            }
+            let percent = prior.flatMap { percentChange(current: hours, previous: $0) }
             return Position(id: id, name: activity.name, colorHex: activity.colorHex,
                             iconName: activity.iconName, hours: hours, deltaHours: delta,
                             deltaPercent: percent)

@@ -4,6 +4,7 @@ import SwiftUI
 struct MetricDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(AppState.self) private var appState
     let metric: Metric
     @Query private var allEntries: [MetricEntry]
     @State private var range: TimeRange = .month
@@ -18,26 +19,17 @@ struct MetricDetailView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
-                header
-                if entries.isEmpty {
-                    Text("No entries yet.").typography(.body).foregroundStyle(Theme.textSecondary)
-                        .padding(.vertical, Theme.Spacing.xl)
-                } else {
-                    MetricChartCard(metric: metric, entries: entries, range: $range)
-                    statsGrid
-                    SectionHeader(title: "HISTORY")
-                    ForEach(entries) { entry in
-                        MetricEntryRow(entry: entry, unit: metric.unit,
-                                       onEdit: { activeSheet = .entry(entry) },
-                                       onPhoto: { photoData = entry.screenshotData })
-                            .swipeActions {
-                                Button("Delete", role: .destructive) { delete(entry) }.tint(Theme.down)
-                            }
-                    }
-                }
-            }.padding(Theme.Spacing.lg).padding(.bottom, Theme.Spacing.xxl)
+        Group {
+#if DEBUG
+            if DebugWorkState.isSeeding {
+                ProgressView("Loading sample data...").tint(Theme.accent)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                metricContent
+            }
+#else
+            metricContent
+#endif
         }
         .background(Theme.background.ignoresSafeArea())
         .navigationBarBackButtonHidden()
@@ -70,6 +62,33 @@ struct MetricDetailView: View {
             Button("OK", role: .cancel) {}
         } message: { Text(errorMessage ?? "") }
         .tint(Theme.accent)
+#if DEBUG
+        .onChange(of: appState.sampleDataRefreshVersion) { _, _ in }
+#endif
+    }
+
+    private var metricContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
+                header
+                if entries.isEmpty {
+                    Text("No entries yet.").typography(.body).foregroundStyle(Theme.textSecondary)
+                        .padding(.vertical, Theme.Spacing.xl)
+                } else {
+                    MetricChartCard(metric: metric, entries: entries, range: $range)
+                    statsGrid
+                    SectionHeader(title: "HISTORY")
+                    ForEach(entries) { entry in
+                        MetricEntryRow(entry: entry, unit: metric.unit,
+                                       onEdit: { activeSheet = .entry(entry) },
+                                       onPhoto: { photoData = entry.screenshotData })
+                            .swipeActions {
+                                Button("Delete", role: .destructive) { delete(entry) }.tint(Theme.down)
+                            }
+                    }
+                }
+            }.padding(Theme.Spacing.lg).padding(.bottom, Theme.Spacing.xxl)
+        }
     }
 
     private var header: some View {

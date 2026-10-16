@@ -128,24 +128,36 @@ enum StatsAnalytics {
 
     static func summarize(sessions: [Session], kind: StatsPeriodKind, anchor: Date, now: Date,
                           calendar: Calendar = .current) -> Summary {
+        Analytics.recordRecompute()
+#if DEBUG
+        if DebugWorkState.isSeeding {
+            let period = period(kind: kind, anchor: anchor, calendar: calendar)
+            return Summary(period: period, bucketValues: [], totalHours: 0, previousHours: 0,
+                           deltaHours: 0, deltaPercent: nil, breakdown: [], activeDays: 0,
+                           daysSoFar: 0, averagePerActiveDay: 0, bestDay: nil, topPosition: nil)
+        }
+#endif
         let period = period(kind: kind, anchor: anchor, calendar: calendar)
-        let current = sessions.filter { $0.date >= period.start && $0.date < period.end && $0.date <= now }
-        let previous = sessions.filter { $0.date >= period.previousStart && $0.date < period.previousEnd }
+        let current = sessions.filter { $0.hours.isFinite && $0.date >= period.start && $0.date < period.end && $0.date <= now }
+        let previous = sessions.filter { $0.hours.isFinite && $0.date >= period.previousStart && $0.date < period.previousEnd }
         var buckets: [Int: [UUID: Double]] = [:]
         var models: [UUID: Activity] = [:]
         var days: [Date: Double] = [:]
         var positions: [UUID: Double] = [:]
+        var currentGuard = LoopGuard("StatsAnalytics.summarize.current")
         for session in current {
+            guard currentGuard.next() else { break }
+            let hours = Analytics.boundedHours(session.hours)
             let date = calendar.startOfDay(for: session.date)
-            days[date, default: 0] += session.hours
+            days[date, default: 0] += hours
             guard let activity = session.activity else { continue }
             models[activity.id] = activity
             let index = bucketIndex(session.date, kind: kind, period: period, calendar: calendar)
-            if period.bucketDates.indices.contains(index) { buckets[index, default: [:]][activity.id, default: 0] += session.hours }
-            positions[activity.id, default: 0] += session.hours
+            if period.bucketDates.indices.contains(index) { buckets[index, default: [:]][activity.id, default: 0] += hours }
+            positions[activity.id, default: 0] += hours
         }
-        let total = current.reduce(0) { $0 + $1.hours }
-        let prior = previous.reduce(0) { $0 + $1.hours }
+        let total = current.reduce(0) { $0 + Analytics.boundedHours($1.hours) }
+        let prior = previous.reduce(0) { $0 + Analytics.boundedHours($1.hours) }
         let breakdown = positions.compactMap { id, hours -> ActivitySlice? in
             guard let model = models[id] else { return nil }
             return ActivitySlice(id: id, name: model.name, colorHex: model.colorHex, iconName: model.iconName,
@@ -173,7 +185,7 @@ enum StatsAnalytics {
             }
         }
         return Summary(period: period, bucketValues: chartValues, totalHours: total, previousHours: prior,
-                       deltaHours: delta, deltaPercent: prior > 0 ? delta / prior * 100 : nil,
+                       deltaHours: delta, deltaPercent: Analytics.percentChange(current: total, previous: prior),
                        breakdown: breakdown, activeDays: active, daysSoFar: daysSoFar,
                        averagePerActiveDay: active > 0 ? total / Double(active) : 0,
                        bestDay: best, topPosition: breakdown.first)
@@ -188,21 +200,26 @@ enum StatsAnalytics {
 
     /// Heat levels use quartiles of non-zero daily totals; empty days always have level zero.
     static func heatmap(sessions: [Session], today: Date, calendar: Calendar = .current) -> [HeatDay] {
+        Analytics.recordRecompute()
         let end = calendar.startOfDay(for: today)
         let first = calendar.date(byAdding: .day, value: -83, to: end) ?? end
         var totals: [Date: Double] = [:]
-        for session in sessions where session.date >= first && session.date < (calendar.date(byAdding: .day, value: 1, to: end) ?? end) {
+        var sessionGuard = LoopGuard("StatsAnalytics.heatmap.sessions")
+        for session in sessions where session.hours.isFinite && session.date >= first && session.date < (calendar.date(byAdding: .day, value: 1, to: end) ?? end) {
+            guard sessionGuard.next() else { break }
             let day = calendar.startOfDay(for: session.date)
-            totals[day, default: 0] += session.hours
+            totals[day, default: 0] += Analytics.boundedHours(session.hours)
         }
-        let values = totals.values.filter { $0 > 0 }.sorted()
+        let values = totals.values.filter { $0.isFinite && $0 > 0 }.sorted()
         func quantile(_ fraction: Double) -> Double {
             guard !values.isEmpty else { return .infinity }
             return values[min(values.count - 1, Int((Double(values.count) * fraction).rounded(.up)) - 1)]
         }
         let q1 = quantile(0.25), q2 = quantile(0.5), q3 = quantile(0.75)
+        var dayGuard = LoopGuard("StatsAnalytics.heatmap.days")
         return (0..<84).compactMap { offset in
-            guard let date = calendar.date(byAdding: .day, value: offset, to: first) else { return nil }
+            guard dayGuard.next(),
+                  let date = calendar.date(byAdding: .day, value: offset, to: first) else { return nil }
             let hours = totals[date, default: 0]
             let level = hours <= 0 ? 0 : hours <= q1 ? 1 : hours <= q2 ? 2 : hours <= q3 ? 3 : 4
             return HeatDay(date: date, hours: hours, level: level)

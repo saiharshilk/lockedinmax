@@ -27,6 +27,25 @@ struct ActivityDetailView: View {
     }
 
     var body: some View {
+        Group {
+#if DEBUG
+            if DebugWorkState.isSeeding {
+                ProgressView("Loading sample data...").tint(Theme.accent)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Theme.background.ignoresSafeArea())
+            } else {
+                activityContent
+            }
+#else
+            activityContent
+#endif
+        }
+#if DEBUG
+        .onChange(of: appState.sampleDataRefreshVersion) { _, _ in }
+#endif
+    }
+
+    private var activityContent: some View {
         List {
             header
             if sessions.isEmpty {
@@ -140,7 +159,7 @@ struct ActivityDetailView: View {
         HStack {
             Text(group.date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)).uppercased())
             Spacer()
-            Text(Formatters.hours(group.sessions.reduce(0) { $0 + $1.hours }))
+            Text(Formatters.hours(group.sessions.reduce(0) { $0 + Analytics.boundedHours($1.hours) }))
         }
         .typography(.sectionLabel)
         .foregroundStyle(Theme.textTertiary)

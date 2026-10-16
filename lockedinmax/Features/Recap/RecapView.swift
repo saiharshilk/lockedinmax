@@ -22,10 +22,61 @@ struct RecapView: View {
         let days = Set((sessions.map(\.date) + metrics.map(\.date)).map { Calendar.current.startOfDay(for: $0) })
         return days.filter { $0 <= Calendar.current.startOfDay(for: .now) }.sorted(by: >).prefix(7).map { $0 }
     }
-    private var daySessions: [Session] { sessions.filter { Calendar.current.isDate($0.date, inSameDayAs: selectedDay) } }
-    private var dayScores: [MetricEntry] { metrics.filter { Calendar.current.isDate($0.date, inSameDayAs: selectedDay) } }
+    private var sessionCardData: SessionRecapCardData? {
+        guard let selectedSession else { return nil }
+        return RecapCardFactory.session(selectedSession, allSessions: sessions, scores: metrics,
+                                        caption: caption, format: format, background: cardBackground)
+    }
+    private var marketCardData: MarketCloseCardData {
+        RecapCardFactory.marketClose(selectedDay, sessions: sessions, scores: metrics, format: format)
+    }
+    private var currentCard: AnyView {
+        if marketClose { return AnyView(MarketCloseCard(data: marketCardData)) }
+        if let sessionCardData { return AnyView(SessionCard(data: sessionCardData)) }
+        return AnyView(EmptyView())
+    }
 
     var body: some View {
+        Group {
+#if DEBUG
+            if DebugWorkState.isSeeding {
+                ProgressView("Loading sample data...").tint(Theme.accent)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                recapContent
+            }
+#else
+            recapContent
+#endif
+        }
+        .background(Theme.background.ignoresSafeArea())
+        .navigationTitle("").navigationBarTitleDisplayMode(.inline)
+        .onAppear(perform: consumeRoute)
+        .onChange(of: appState.sessionRecapID) { _, _ in consumeRoute() }
+        .onChange(of: sessions.count) { _, _ in selectDefaultSession(); renderExport() }
+        .onChange(of: metrics.count) { _, _ in renderExport() }
+        .onChange(of: renderKey) { _, _ in renderExport() }
+        .onChange(of: selectedSessionID) { _, _ in
+            caption = selectedSession?.note ?? ""
+            if selectedSession?.photoData == nil { cardBackground = .dark }
+            renderExport()
+        }
+        .onChange(of: caption) { _, _ in renderExport() }
+        .onChange(of: marketClose) { _, _ in renderExport() }
+        .onChange(of: selectedDay) { _, _ in renderExport() }
+        .onChange(of: format) { _, _ in renderExport() }
+        .onChange(of: cardBackground) { _, _ in renderExport() }
+#if DEBUG
+        .onChange(of: appState.sampleDataRefreshVersion) { _, _ in renderExport() }
+#endif
+        .task(id: DebugWorkState.generation) {
+            guard !DebugWorkState.isSeeding else { return }
+            renderExport()
+        }
+        .tint(Theme.accent)
+    }
+
+    private var recapContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                 Text("Recap").typography(.title).foregroundStyle(Theme.textPrimary)
@@ -40,25 +91,6 @@ struct RecapView: View {
             }
             .padding(Theme.Spacing.lg).padding(.bottom, Theme.Spacing.xxl)
         }
-        .background(Theme.background.ignoresSafeArea())
-        .navigationTitle("").navigationBarTitleDisplayMode(.inline)
-        .onAppear(perform: consumeRoute)
-        .onChange(of: appState.sessionRecapID) { _, _ in consumeRoute() }
-        .onChange(of: sessions.count) { _, _ in selectDefaultSession(); renderCard() }
-        .onChange(of: metrics.count) { _, _ in renderCard() }
-        .onChange(of: renderKey) { _, _ in renderCard() }
-        .onChange(of: selectedSessionID) { _, _ in
-            caption = selectedSession?.note ?? ""
-            if selectedSession?.photoData == nil { cardBackground = .dark }
-            renderCard()
-        }
-        .onChange(of: caption) { _, _ in renderCard() }
-        .onChange(of: marketClose) { _, _ in renderCard() }
-        .onChange(of: selectedDay) { _, _ in renderCard() }
-        .onChange(of: format) { _, _ in renderCard() }
-        .onChange(of: cardBackground) { _, _ in renderCard() }
-        .task(id: renderKey) { renderCard() }
-        .tint(Theme.accent)
     }
 
     @ViewBuilder private var selectionControls: some View {
@@ -94,7 +126,6 @@ struct RecapView: View {
         }
     }
 
-
     private var captionField: some View {
         TextField("Caption", text: Binding(get: { caption }, set: { caption = String($0.prefix(80)) }))
             .typography(.body).foregroundStyle(Theme.textPrimary).padding(Theme.Spacing.md).surfaceCard()
@@ -103,24 +134,13 @@ struct RecapView: View {
 
     private var cardPreview: some View {
         GeometryReader { geometry in
-            cardView.scaleEffect(min(geometry.size.width / format.size.width, 1), anchor: .top)
+            currentCard.scaleEffect(min(geometry.size.width / format.size.width, 1), anchor: .top)
                 .frame(width: format.size.width * min(geometry.size.width / format.size.width, 1),
                        height: format.size.height * min(geometry.size.width / format.size.width, 1), alignment: .top)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(height: format.size.height * min((UIScreen.main.bounds.width - Theme.Spacing.xl * 2 - Theme.Spacing.sm) / format.size.width, 1))
         .padding(Theme.Spacing.xs).surfaceCard()
-    }
-
-    @ViewBuilder private var cardView: some View {
-        if marketClose {
-            MarketCloseCard(date: selectedDay, sessions: daySessions, allSessions: sessions, scores: dayScores, format: format)
-        } else if let selectedSession {
-            let sessionDay = sessions.filter { Calendar.current.isDate($0.date, inSameDayAs: selectedSession.date) }
-            SessionCard(session: selectedSession, sessions: sessions, daySessions: sessionDay,
-                        sameDayScores: metrics.filter { Calendar.current.isDate($0.date, inSameDayAs: selectedSession.date) },
-                        caption: caption, format: format, cardBackground: cardBackground)
-        }
     }
 
     private var shareButton: some View {
@@ -145,17 +165,33 @@ struct RecapView: View {
     }
 
     private var renderKey: String {
-        let sessionBits = sessions.map {
-            "\($0.id)-\($0.date.timeIntervalSince1970)-\($0.hours)-\($0.note)-\($0.photoData?.hashValue ?? 0)-\($0.activity?.name ?? "")-\($0.activity?.colorHex ?? "")"
-        }.joined(separator: "|")
+#if DEBUG
+        guard !DebugWorkState.isSeeding else { return "seeding" }
+#endif
+        let sessionBits = sessions.map { "\($0.id)-\($0.date.timeIntervalSince1970)-\($0.hours)-\($0.note)-\($0.photoData?.hashValue ?? 0)-\($0.activity?.name ?? "")-\($0.activity?.colorHex ?? "")" }.joined(separator: "|")
         let scoreBits = metrics.map { "\($0.id)-\($0.date.timeIntervalSince1970)-\($0.value)-\($0.metric?.name ?? "")" }.joined(separator: "|")
-        let activityBits = sessions.compactMap(\.activity).map { "\($0.id)-\($0.name)-\($0.colorHex)" }.joined(separator: "|")
-        return "\(sessionBits)\(scoreBits)\(activityBits)\(marketClose)\(selectedSessionID?.uuidString ?? "")\(selectedDay)\(caption)\(format)\(cardBackground)"
+        let storedActivityBits = sessions.compactMap(\.activity).map { "\($0.id)-\($0.name)-\($0.colorHex)" }.joined(separator: "|")
+        return "\(sessionBits)\(scoreBits)\(storedActivityBits)\(marketClose)\(selectedSessionID?.uuidString ?? "")\(selectedDay)\(caption)\(format)\(cardBackground)"
     }
 
-    @MainActor private func renderCard() {
+    @MainActor private func renderExport() {
+#if DEBUG
+        guard !DebugWorkState.isSeeding else { return }
+#endif
         guard !sessions.isEmpty else { exportedImage = nil; return }
-        let renderer = ImageRenderer(content: cardView)
+#if DEBUG
+        DebugDiagnostics.shared.recordRecapRender()
+#endif
+        let card: AnyView
+        if marketClose {
+            card = AnyView(MarketCloseCard(data: marketCardData))
+        } else if let sessionCardData {
+            card = AnyView(SessionCard(data: sessionCardData))
+        } else {
+            exportedImage = nil
+            return
+        }
+        let renderer = ImageRenderer(content: card)
         renderer.scale = 3
         renderer.proposedSize = ProposedViewSize(format.size)
         exportedImage = renderer.uiImage
@@ -172,7 +208,7 @@ struct RecapView: View {
             caption = sessions.first(where: { $0.id == id })?.note ?? ""
             appState.sessionRecapID = nil
         } else { selectDefaultSession() }
-        renderCard()
+        renderExport()
     }
 }
 

@@ -15,6 +15,9 @@ struct DesignSystemPreview: View {
                 colors
                 typography
                 components
+#if DEBUG
+                DebugDataTools()
+#endif
             }
             .padding(Theme.Spacing.xl)
         }

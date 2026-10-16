@@ -25,13 +25,16 @@ struct SessionLogForm: View {
             TextField("0.0", text: $hours)
                 .keyboardType(.decimalPad).typography(.heroNumber)
                 .foregroundStyle(Theme.textPrimary).accessibilityLabel("Hours")
+            if LogInput.exceedsSessionLimit(hours) {
+                Text("Max 24 hours per session").typography(.caption).foregroundStyle(Theme.down)
+            }
             DatePicker("Date", selection: $date, displayedComponents: [.date, .hourAndMinute])
                 .logInputStyle()
             TextField("Note (optional)", text: $note, axis: .vertical).logInputStyle()
             PhotoInput(title: "Add photo (optional)", large: false, data: $photoData,
                        isLoading: $isLoadingPhoto)
             PrimaryButton(title: "SAVE SESSION", action: save)
-                .disabled(activity == nil || LogInput.positiveNumber(hours) == nil || isLoadingPhoto)
+                .disabled(activity == nil || LogInput.sessionHours(hours) == nil || isLoadingPhoto)
         }
         .sheet(isPresented: $showingNew) { NewActivitySheet { activity = $0 } }
         .onAppear { applyPrefilledActivity() }
@@ -54,7 +57,7 @@ struct SessionLogForm: View {
     }
 
     private func save() {
-        guard let activity, let value = LogInput.positiveNumber(hours) else { return }
+        guard let activity, let value = LogInput.sessionHours(hours) else { return }
         context.insert(Session(date: date, hours: value, note: note, photoData: photoData, activity: activity))
         do {
             try context.save()

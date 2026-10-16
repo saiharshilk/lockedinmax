@@ -16,24 +16,22 @@ struct HomeView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
-                header
-
-                if sessions.isEmpty {
-                    HomeEmptyState { appState.selectedTab = .log }
-                } else {
-                    TimeSeriesChartCard(sessions: sessions, label: "Time Invested",
-                                        range: $range, mode: $mode)
-                    HomePositions(positions: summary.positions,
-                                  activityBuckets: summary.activityBuckets,
-                                  activities: activities)
-                }
+        Group {
+#if DEBUG
+            if DebugWorkState.isSeeding {
+                ProgressView("Loading sample data...").tint(Theme.accent)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                homeContent
             }
-            .padding(Theme.Spacing.xl)
-            .padding(.bottom, Theme.Spacing.xxl)
+#else
+            homeContent
+#endif
         }
         .background(Theme.background.ignoresSafeArea())
+#if DEBUG
+        .onChange(of: appState.sampleDataRefreshVersion) { _, _ in }
+#endif
         .navigationTitle("")
         .toolbar {
 #if DEBUG
@@ -57,6 +55,26 @@ struct HomeView: View {
             .tint(Theme.accent)
         }
 #endif
+    }
+
+    private var homeContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
+                header
+
+                if sessions.isEmpty {
+                    HomeEmptyState { appState.selectedTab = .log }
+                } else {
+                    TimeSeriesChartCard(sessions: sessions, label: "Time Invested",
+                                        range: $range, mode: $mode)
+                    HomePositions(positions: summary.positions,
+                                  activityBuckets: summary.activityBuckets,
+                                  activities: activities)
+                }
+            }
+            .padding(Theme.Spacing.xl)
+            .padding(.bottom, Theme.Spacing.xxl)
+        }
     }
 
     private var header: some View {

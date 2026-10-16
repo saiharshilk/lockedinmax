@@ -11,6 +11,24 @@ struct ScoreStatsView: View {
     }
 
     var body: some View {
+        Group {
+#if DEBUG
+            if DebugWorkState.isSeeding {
+                ProgressView("Loading sample data...").tint(Theme.accent)
+                    .frame(maxWidth: .infinity, minHeight: 160)
+            } else {
+                scoreContent
+            }
+#else
+            scoreContent
+#endif
+        }
+#if DEBUG
+        .onChange(of: appState.sampleDataRefreshVersion) { _, _ in }
+#endif
+    }
+
+    private var scoreContent: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
             if metrics.isEmpty {
                 emptyState

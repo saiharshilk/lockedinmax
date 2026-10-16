@@ -11,6 +11,12 @@ extension StatsAnalytics {
 
     static func metricSummary(entries: [MetricEntry], range: TimeRange, now: Date,
                               calendar: Calendar = .current) -> MetricSummary {
+        Analytics.recordRecompute()
+#if DEBUG
+        if DebugWorkState.isSeeding {
+            return MetricSummary(entries: [], latest: nil, change: nil, best: nil, average: 0)
+        }
+#endif
         let start: Date
         switch range {
         case .day: start = calendar.startOfDay(for: now)
@@ -20,7 +26,8 @@ extension StatsAnalytics {
         case .year: start = calendar.date(byAdding: .day, value: -365, to: now) ?? now
         case .all: start = min(entries.map(\.date).min() ?? now, now)
         }
-        let filtered = entries.filter { $0.date >= start && $0.date <= now }.sorted { $0.date < $1.date }
+        let filtered = entries.filter { $0.value.isFinite && $0.date >= start && $0.date <= now }
+            .sorted { $0.date < $1.date }
         let change: Double?
         if filtered.count >= 2, let first = filtered.first, let last = filtered.last {
             change = last.value - first.value
