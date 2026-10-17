@@ -4,15 +4,17 @@ import SwiftUI
 struct NewActivitySheet: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @Query private var activities: [Activity]
     @State private var name: String
     @State private var colorHex: String
     @State private var iconName: String
     @State private var errorMessage: String?
-    let existingActivity: Activity?
-    let onSaved: (Activity) -> Void
+    let existingActivityID: UUID?
+    let onSaved: (UUID) -> Void
+    private var existingActivity: Activity? { activities.first { $0.id == existingActivityID } }
 
-    init(activity: Activity? = nil, onSaved: @escaping (Activity) -> Void) {
-        existingActivity = activity
+    init(activity: Activity? = nil, onSaved: @escaping (UUID) -> Void) {
+        existingActivityID = activity?.id
         self.onSaved = onSaved
         _name = State(initialValue: activity?.name ?? "")
         _colorHex = State(initialValue: activity?.colorHex ?? Theme.activityColorPresets[0])
@@ -78,7 +80,11 @@ struct NewActivitySheet: View {
 
     private func save() {
         let activity: Activity
-        if let existingActivity {
+        if let existingActivityID {
+            guard let existingActivity = activities.first(where: { $0.id == existingActivityID }) else {
+                dismiss()
+                return
+            }
             activity = existingActivity
             activity.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
             activity.colorHex = colorHex
@@ -90,7 +96,7 @@ struct NewActivitySheet: View {
         }
         do {
             try context.save()
-            onSaved(activity)
+            onSaved(activity.id)
             dismiss()
         } catch {
             context.rollback()

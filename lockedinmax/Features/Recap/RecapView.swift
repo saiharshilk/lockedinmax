@@ -54,8 +54,18 @@ struct RecapView: View {
         .onAppear(perform: consumeRoute)
         .onChange(of: appState.sessionRecapID) { _, _ in consumeRoute() }
         .onChange(of: sessions.count) { _, _ in selectDefaultSession(); renderExport() }
+        .onChange(of: sessions.map(\.id)) { _, ids in
+            if let selectedSessionID, !ids.contains(selectedSessionID) { self.selectedSessionID = nil }
+            if let routeID = appState.sessionRecapID, !ids.contains(routeID) { appState.sessionRecapID = nil }
+        }
+        .onChange(of: DebugWorkState.generation) { _, _ in
+            if let selectedSessionID, !sessions.contains(where: { $0.id == selectedSessionID }) {
+                self.selectedSessionID = nil
+            }
+        }
         .onChange(of: metrics.count) { _, _ in renderExport() }
         .onChange(of: renderKey) { _, _ in renderExport() }
+        .onChange(of: metrics.map(\.id)) { _, _ in renderExport() }
         .onChange(of: selectedSessionID) { _, _ in
             caption = selectedSession?.note ?? ""
             if selectedSession?.photoData == nil { cardBackground = .dark }
@@ -202,7 +212,7 @@ struct RecapView: View {
     }
 
     private func consumeRoute() {
-        if let id = appState.sessionRecapID {
+        if let id = appState.sessionRecapID, sessions.contains(where: { $0.id == id }) {
             selectedSessionID = id
             marketClose = false
             caption = sessions.first(where: { $0.id == id })?.note ?? ""

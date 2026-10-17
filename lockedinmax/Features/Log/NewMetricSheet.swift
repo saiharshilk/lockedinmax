@@ -4,10 +4,11 @@ import SwiftUI
 struct NewMetricSheet: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @Query private var metrics: [Metric]
     @State private var name = ""
     @State private var unit = ""
     @State private var errorMessage: String?
-    let onCreated: (Metric) -> Void
+    let onCreated: (UUID) -> Void
 
     var body: some View {
         NavigationStack {
@@ -35,7 +36,7 @@ struct NewMetricSheet: View {
         context.insert(metric)
         do {
             try context.save()
-            onCreated(metric)
+            onCreated(metric.id)
             dismiss()
         } catch {
             context.rollback()

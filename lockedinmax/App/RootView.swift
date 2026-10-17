@@ -2,32 +2,38 @@ import SwiftData
 import SwiftUI
 
 struct RootView: View {
+    @Environment(\.modelContext) private var modelContext
     @State private var appState = AppState()
+    @State private var homePath = NavigationPath()
+    @State private var statsPath = NavigationPath()
+    @State private var logPath = NavigationPath()
+    @State private var recapPath = NavigationPath()
 #if DEBUG
     @State private var didRunSampleDataSelfCheck = false
+    @State private var didRunChurnTest = false
 #endif
 
     var body: some View {
         TabView(selection: $appState.selectedTab) {
-            navigation {
+            navigation(path: $homePath) {
                 HomeView()
             }
             .tag(AppTab.home)
             .tabItem { Label("Home", systemImage: "chart.line.uptrend.xyaxis") }
 
-            navigation {
+            navigation(path: $statsPath) {
                 StatsView()
             }
             .tag(AppTab.stats)
             .tabItem { Label("Stats", systemImage: "chart.bar.xaxis") }
 
-            navigation {
+            navigation(path: $logPath) {
                 LogView()
             }
             .tag(AppTab.log)
             .tabItem { Label("Log", systemImage: "plus.circle") }
 
-            navigation {
+            navigation(path: $recapPath) {
                 RecapView()
             }
             .tag(AppTab.recap)
@@ -38,6 +44,12 @@ struct RootView: View {
         .foregroundStyle(Theme.textPrimary)
         .background(Theme.background.ignoresSafeArea())
         .preferredColorScheme(.dark)
+        .onChange(of: appState.navigationResetVersion) { _, _ in
+            homePath = NavigationPath()
+            statsPath = NavigationPath()
+            logPath = NavigationPath()
+            recapPath = NavigationPath()
+        }
 #if DEBUG
         .task {
             let arguments = ProcessInfo.processInfo.arguments
@@ -48,12 +60,17 @@ struct RootView: View {
             if arguments.contains("--analytics-sweep") {
                 NSLog("[AnalyticsSweepArgument] %@", AnalyticsSweep.runAnalyticsSweep().description)
             }
+            if arguments.contains("--churn-test") && !didRunChurnTest {
+                didRunChurnTest = true
+                await DebugDataOperations.launchChurnTestIfRequested(in: modelContext, appState: appState)
+            }
         }
 #endif
     }
 
-    private func navigation<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        NavigationStack {
+    private func navigation<Content: View>(path: Binding<NavigationPath>,
+                                            @ViewBuilder content: () -> Content) -> some View {
+        NavigationStack(path: path) {
             content()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Theme.background.ignoresSafeArea())

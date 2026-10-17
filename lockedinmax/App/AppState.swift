@@ -28,7 +28,26 @@ final class AppState {
     var sessionActivityID: UUID?
     var sessionRecapID: UUID?
     var logScoreRequested = false
+    private(set) var navigationResetVersion = 0
+
+    func prepareForBulkDataChange() {
+        sessionActivityID = nil
+        sessionRecapID = nil
+        selectedTab = .home
+        navigationResetVersion += 1
+    }
+
 #if DEBUG
+    private(set) var churnTestResult: String?
+
+    func setChurnTestResult(_ result: String) {
+        churnTestResult = result
+    }
+
+    func clearChurnTestResult() {
+        churnTestResult = nil
+    }
+
     private(set) var sampleDataRefreshVersion = 0
 
     func sampleDataDidFinishLoading() {

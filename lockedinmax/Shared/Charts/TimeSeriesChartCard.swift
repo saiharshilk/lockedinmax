@@ -12,7 +12,8 @@ struct TimeSeriesChartCard: View {
     @Binding var range: TimeRange
     @Binding var mode: ChartMode
     @State private var selectedDate: Date?
-    @State private var selectedPoint: Analytics.ChartPoint?
+    @State private var selectedPointID: Int?
+    private var selectedPoint: Analytics.ChartPoint? { points.first { $0.id == selectedPointID } }
     @State private var scrubTrigger = 0
 
     private var summary: Analytics.Summary {
@@ -44,6 +45,9 @@ struct TimeSeriesChartCard: View {
         .onChange(of: selectedDate) { _, date in updateSelection(date) }
         .onChange(of: range) { _, _ in clearSelection() }
         .onChange(of: mode) { _, _ in clearSelection() }
+        .onChange(of: points.map(\.id)) { _, ids in
+            if let selectedPointID, !ids.contains(selectedPointID) { self.selectedPointID = nil }
+        }
         .sensoryFeedback(.selection, trigger: scrubTrigger)
     }
 
@@ -130,14 +134,14 @@ struct TimeSeriesChartCard: View {
     private func updateSelection(_ date: Date?) {
         guard let date, let nearest = points.min(by: {
             abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date))
-        }) else { selectedPoint = nil; return }
-        if nearest.date != selectedPoint?.date || nearest.value != selectedPoint?.value {
-            selectedPoint = nearest
+        }) else { selectedPointID = nil; return }
+        if nearest.id != selectedPointID {
+            selectedPointID = nearest.id
             scrubTrigger += 1
         }
     }
 
-    private func clearSelection() { selectedDate = nil; selectedPoint = nil }
+    private func clearSelection() { selectedDate = nil; selectedPointID = nil }
 
     private func dateLabel(_ date: Date) -> String {
         date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)).uppercased()

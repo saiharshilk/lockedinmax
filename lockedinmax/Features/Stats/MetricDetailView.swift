@@ -5,15 +5,17 @@ struct MetricDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Environment(AppState.self) private var appState
-    let metric: Metric
+    let metricID: UUID
+    @Query private var metrics: [Metric]
     @Query private var allEntries: [MetricEntry]
+    private var metric: Metric? { metrics.first { $0.id == metricID } }
     @State private var range: TimeRange = .month
     @State private var activeSheet: MetricSheet?
     @State private var photoData: Data?
     @State private var confirmingDelete = false
     @State private var errorMessage: String?
 
-    private var entries: [MetricEntry] { allEntries.filter { $0.metric?.id == metric.id }.sorted { $0.date > $1.date } }
+    private var entries: [MetricEntry] { allEntries.filter { $0.metric?.id == metricID }.sorted { $0.date > $1.date } }
     private var summary: StatsAnalytics.MetricSummary {
         StatsAnalytics.metricSummary(entries: entries, range: range, now: .now)
     }
@@ -24,11 +26,14 @@ struct MetricDetailView: View {
             if DebugWorkState.isSeeding {
                 ProgressView("Loading sample data...").tint(Theme.accent)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
+            } else if metric != nil {
                 metricContent
+            } else {
+                ContentUnavailableView("Metric deleted", systemImage: "trash").task { dismiss() }
             }
 #else
-            metricContent
+            if metric != nil { metricContent }
+            else { ContentUnavailableView("Metric deleted", systemImage: "trash").task { dismiss() } }
 #endif
         }
         .background(Theme.background.ignoresSafeArea())
@@ -47,14 +52,21 @@ struct MetricDetailView: View {
         }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
-            case .metric: MetricEditSheet(metric: metric)
-            case .entry(let entry): MetricEntryEditSheet(entry: entry)
+            case .metric:
+                if let metric { MetricEditSheet(metricID: metric.id, name: metric.name, unit: metric.unit) }
+                else { EmptyView() }
+            case .entry(let id):
+                if let entry = entries.first(where: { $0.id == id }) {
+                    MetricEntryEditSheet(entryID: entry.id, value: entry.value, date: entry.date,
+                                         screenshotData: entry.screenshotData)
+                }
+                else { EmptyView() }
             }
         }
         .fullScreenCover(isPresented: Binding(get: { photoData != nil }, set: { if !$0 { photoData = nil } })) {
             if let photoData { SessionPhotoViewer(data: photoData) { self.photoData = nil } }
         }
-        .confirmationDialog("Delete \(metric.name)?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+        .confirmationDialog("Delete \(metric?.name ?? "metric")?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete metric and \(entries.count) entries", role: .destructive, action: deleteMetric)
             Button("Cancel", role: .cancel) {}
         } message: { Text("This permanently deletes the metric and all its entries.") }
@@ -63,8 +75,13 @@ struct MetricDetailView: View {
         } message: { Text(errorMessage ?? "") }
         .tint(Theme.accent)
 #if DEBUG
-        .onChange(of: appState.sampleDataRefreshVersion) { _, _ in }
+        .onChange(of: appState.sampleDataRefreshVersion) { _, _ in
+            if metric == nil { dismiss() }
+        }
 #endif
+        .onChange(of: metrics.map(\.id)) { _, ids in
+            if !ids.contains(metricID) { dismiss() }
+        }
     }
 
     private var metricContent: some View {
@@ -75,12 +92,12 @@ struct MetricDetailView: View {
                     Text("No entries yet.").typography(.body).foregroundStyle(Theme.textSecondary)
                         .padding(.vertical, Theme.Spacing.xl)
                 } else {
-                    MetricChartCard(metric: metric, entries: entries, range: $range)
+                    if let metric { MetricChartCard(metric: metric, entries: entries, range: $range) }
                     statsGrid
                     SectionHeader(title: "HISTORY")
                     ForEach(entries) { entry in
-                        MetricEntryRow(entry: entry, unit: metric.unit,
-                                       onEdit: { activeSheet = .entry(entry) },
+                        MetricEntryRow(entry: entry, unit: metric?.unit ?? "",
+                                       onEdit: { activeSheet = .entry(entry.id) },
                                        onPhoto: { photoData = entry.screenshotData })
                             .swipeActions {
                                 Button("Delete", role: .destructive) { delete(entry) }.tint(Theme.down)
@@ -93,16 +110,16 @@ struct MetricDetailView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-            Text(metric.name).typography(.title).foregroundStyle(Theme.textPrimary)
+            Text(metric?.name ?? "Deleted metric").typography(.title).foregroundStyle(Theme.textPrimary)
             Text("SCORE").typography(.sectionLabel).foregroundStyle(Theme.textTertiary)
         }
     }
 
     private var statsGrid: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Theme.Spacing.md) {
-            stat("LATEST", summary.latest.map { Formatters.metric($0.value, unit: metric.unit) } ?? "—")
-            stat("BEST", summary.best.map { Formatters.metric($0, unit: metric.unit) } ?? "—")
-            stat("AVERAGE", summary.entries.isEmpty ? "—" : Formatters.metric(summary.average, unit: metric.unit))
+            stat("LATEST", summary.latest.map { Formatters.metric($0.value, unit: metric?.unit ?? "") } ?? "—")
+            stat("BEST", summary.best.map { Formatters.metric($0, unit: metric?.unit ?? "") } ?? "—")
+            stat("AVERAGE", summary.entries.isEmpty ? "—" : Formatters.metric(summary.average, unit: metric?.unit ?? ""))
             stat("ENTRIES", "\(summary.entries.count)")
         }
     }
@@ -115,10 +132,14 @@ struct MetricDetailView: View {
     }
 
     private func delete(_ entry: MetricEntry) {
+        if case .entry(let id) = activeSheet, id == entry.id { activeSheet = nil }
         context.delete(entry)
         saveContext()
     }
     private func deleteMetric() {
+        guard let metric else { dismiss(); return }
+        activeSheet = nil
+        confirmingDelete = false
         context.delete(metric)
         do { try context.save(); dismiss() } catch { context.rollback(); errorMessage = error.localizedDescription }
     }
@@ -127,13 +148,13 @@ struct MetricDetailView: View {
     }
 
     private enum MetricSheet: Identifiable {
-        case metric, entry(MetricEntry)
-        var id: String { switch self { case .metric: "metric"; case .entry(let entry): entry.id.uuidString } }
+        case metric, entry(UUID)
+        var id: String { switch self { case .metric: "metric"; case .entry(let id): id.uuidString } }
     }
 }
 
 #Preview {
-    NavigationStack { MetricDetailView(metric: Metric(name: "Sleep Score", unit: "pts")) }
+    NavigationStack { MetricDetailView(metricID: UUID()) }
         .modelContainer(for: [Activity.self, Session.self, Metric.self, MetricEntry.self], inMemory: true)
         .preferredColorScheme(.dark)
 }

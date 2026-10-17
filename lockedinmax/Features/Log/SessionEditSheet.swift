@@ -4,7 +4,9 @@ import SwiftUI
 struct SessionEditSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
-    let session: Session
+    let sessionID: UUID
+    @Query private var sessions: [Session]
+    private var session: Session? { sessions.first { $0.id == sessionID } }
     @State private var hours: String
     @State private var date: Date
     @State private var note: String
@@ -12,16 +14,23 @@ struct SessionEditSheet: View {
     @State private var isLoadingPhoto = false
     @State private var errorMessage: String?
 
+    init(sessionID: UUID, hours: Double, date: Date, note: String, photoData: Data?) {
+        self.sessionID = sessionID
+        _hours = State(initialValue: Formatters.hoursValue(hours))
+        _date = State(initialValue: date)
+        _note = State(initialValue: note)
+        _photoData = State(initialValue: photoData)
+    }
+
     init(session: Session) {
-        self.session = session
-        _hours = State(initialValue: Formatters.hoursValue(session.hours))
-        _date = State(initialValue: session.date)
-        _note = State(initialValue: session.note)
-        _photoData = State(initialValue: session.photoData)
+        self.init(sessionID: session.id, hours: session.hours, date: session.date,
+                  note: session.note, photoData: session.photoData)
     }
 
     var body: some View {
-        NavigationStack {
+        Group {
+            if session != nil {
+                NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                     Text("TIME INVESTED · HOURS").typography(.sectionLabel).foregroundStyle(Theme.textTertiary)
@@ -46,12 +55,20 @@ struct SessionEditSheet: View {
             .alert("Could not save session", isPresented: Binding(
                 get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
             )) { Button("OK", role: .cancel) {} } message: { Text(errorMessage ?? "") }
+                }
+            } else {
+                Color.clear.task { dismiss() }
+            }
         }
         .onAppear(perform: resetDraft)
+        .onChange(of: sessions.map(\.id)) { _, ids in
+            if !ids.contains(sessionID) { dismiss() }
+        }
         .tint(Theme.accent).preferredColorScheme(.dark)
     }
 
     private func resetDraft() {
+        guard let session else { dismiss(); return }
         hours = Formatters.hoursValue(session.hours)
         date = session.date
         note = session.note
@@ -60,6 +77,7 @@ struct SessionEditSheet: View {
 
     private func save() {
         guard let value = LogInput.sessionHours(hours) else { return }
+        guard let session else { dismiss(); return }
         session.hours = value
         session.date = date
         session.note = note
@@ -70,6 +88,6 @@ struct SessionEditSheet: View {
 }
 
 #Preview {
-    SessionEditSheet(session: Session(hours: 1.5))
+    SessionEditSheet(sessionID: UUID(), hours: 1.5, date: .now, note: "", photoData: nil)
         .modelContainer(for: [Activity.self, Session.self, Metric.self, MetricEntry.self], inMemory: true)
 }

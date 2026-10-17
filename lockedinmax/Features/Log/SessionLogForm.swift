@@ -5,7 +5,8 @@ struct SessionLogForm: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \Activity.createdAt) private var activities: [Activity]
     @Environment(AppState.self) private var appState
-    @State private var activity: Activity?
+    @State private var activityID: UUID?
+    private var selectedActivity: Activity? { activities.first { $0.id == activityID } }
     @State private var hours = ""
     @State private var date = Date.now
     @State private var note = ""
@@ -18,7 +19,7 @@ struct SessionLogForm: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
             SectionHeader(title: "Position")
-            SelectionChips(items: activities, selection: $activity, title: { $0.name },
+            SelectionChips(items: activities, selection: activitySelection, title: { $0.name },
                            icon: { $0.iconName }, color: { Theme.activityColor($0.colorHex) },
                            newTitle: "+ New") { showingNew = true }
             Text("Time Invested · hours").typography(.sectionLabel).foregroundStyle(Theme.textTertiary)
@@ -34,16 +35,16 @@ struct SessionLogForm: View {
             PhotoInput(title: "Add photo (optional)", large: false, data: $photoData,
                        isLoading: $isLoadingPhoto)
             PrimaryButton(title: "SAVE SESSION", action: save)
-                .disabled(activity == nil || LogInput.sessionHours(hours) == nil || isLoadingPhoto)
+                .disabled(selectedActivity == nil || LogInput.sessionHours(hours) == nil || isLoadingPhoto)
         }
-        .sheet(isPresented: $showingNew) { NewActivitySheet { activity = $0 } }
+        .sheet(isPresented: $showingNew) { NewActivitySheet { activityID = $0 } }
         .onAppear { applyPrefilledActivity() }
         .onChange(of: appState.sessionActivityID) { _, _ in applyPrefilledActivity() }
-        .onChange(of: activities.map(\.id)) { _, _ in applyPrefilledActivity() }
-        .sensoryFeedback(.impact(weight: .light), trigger: saveCount)
         .onChange(of: activities.map(\.id)) { _, ids in
-            if let activity, !ids.contains(activity.id) { self.activity = nil }
+            if let activityID, !ids.contains(activityID) { self.activityID = nil }
+            applyPrefilledActivity()
         }
+        .sensoryFeedback(.impact(weight: .light), trigger: saveCount)
         .alert("Could not save session", isPresented: Binding(
             get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
         )) { Button("OK", role: .cancel) {} } message: { Text(errorMessage ?? "") }
@@ -51,17 +52,21 @@ struct SessionLogForm: View {
 
     private func applyPrefilledActivity() {
         guard let id = appState.sessionActivityID,
-              let activity = activities.first(where: { $0.id == id }) else { return }
-        self.activity = activity
+              activities.contains(where: { $0.id == id }) else { return }
+        activityID = id
         appState.sessionActivityID = nil
     }
 
+    private var activitySelection: Binding<Activity?> {
+        Binding(get: { selectedActivity }, set: { activityID = $0?.id })
+    }
+
     private func save() {
-        guard let activity, let value = LogInput.sessionHours(hours) else { return }
+        guard let activity = selectedActivity, let value = LogInput.sessionHours(hours) else { return }
         context.insert(Session(date: date, hours: value, note: note, photoData: photoData, activity: activity))
         do {
             try context.save()
-            self.activity = nil
+            activityID = nil
             hours = ""
             date = .now
             note = ""

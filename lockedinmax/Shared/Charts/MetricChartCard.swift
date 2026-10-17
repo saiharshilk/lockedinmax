@@ -6,13 +6,14 @@ struct MetricChartCard: View {
     let entries: [MetricEntry]
     @Binding var range: TimeRange
     @State private var selectedDate: Date?
-    @State private var selected: MetricEntry?
+    @State private var selectedID: UUID?
     @State private var selectionTick = 0
 
     private var summary: StatsAnalytics.MetricSummary {
         StatsAnalytics.metricSummary(entries: entries, range: range, now: .now)
     }
     private var points: [MetricEntry] { summary.entries }
+    private var selected: MetricEntry? { points.first { $0.id == selectedID } }
     private var displayed: MetricEntry? { selected ?? summary.latest }
     private var change: Double? { summary.change }
 
@@ -38,7 +39,10 @@ struct MetricChartCard: View {
         }
         .padding(Theme.Spacing.lg).surfaceCard()
         .onChange(of: selectedDate) { _, date in selectNearest(to: date) }
-        .onChange(of: range) { _, _ in selectedDate = nil; selected = nil }
+        .onChange(of: range) { _, _ in selectedDate = nil; selectedID = nil }
+        .onChange(of: points.map(\.id)) { _, ids in
+            if let selectedID, !ids.contains(selectedID) { self.selectedID = nil }
+        }
         .sensoryFeedback(.selection, trigger: selectionTick)
     }
 
@@ -74,7 +78,7 @@ struct MetricChartCard: View {
         .chartLegend(.hidden)
         .simultaneousGesture(DragGesture(minimumDistance: 0).onEnded { _ in
             selectedDate = nil
-            selected = nil
+            selectedID = nil
         })
     }
 
@@ -115,8 +119,8 @@ struct MetricChartCard: View {
     private func selectNearest(to date: Date?) {
         guard let date, let nearest = points.min(by: {
             abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date))
-        }) else { selected = nil; return }
-        if selected?.id != nearest.id { selected = nearest; selectionTick += 1 }
+        }) else { selectedID = nil; return }
+        if selectedID != nearest.id { selectedID = nearest.id; selectionTick += 1 }
     }
 }
 

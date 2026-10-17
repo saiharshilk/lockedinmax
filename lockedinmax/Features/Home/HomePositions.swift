@@ -17,13 +17,13 @@ struct HomePositions: View {
                 ForEach(positions) { position in
                     if let activity = activities.first(where: { $0.id == position.id }) {
                         NavigationLink {
-                            ActivityDetailView(activity: activity)
+                            ActivityDetailView(activityID: activity.id)
                         } label: {
                             row(position)
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(PositionRowButtonStyle())
-                        .sensoryFeedback(.impact(weight: .light), trigger: activity.name)
+                        .sensoryFeedback(.impact(weight: .light), trigger: activity.id)
                     } else {
                         row(position)
                     }

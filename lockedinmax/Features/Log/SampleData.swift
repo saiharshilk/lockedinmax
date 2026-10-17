@@ -195,7 +195,7 @@ enum SampleData {
         }
     }
 
-    private struct Counts: Equatable, CustomStringConvertible {
+    struct Counts: Equatable, CustomStringConvertible {
         let sessions: Int
         let activities: Int
         let metrics: Int
@@ -205,7 +205,7 @@ enum SampleData {
         }
     }
 
-    private static func counts(in context: ModelContext) throws -> Counts {
+    static func counts(in context: ModelContext) throws -> Counts {
         Counts(sessions: try context.fetchCount(FetchDescriptor<Session>()),
                activities: try context.fetchCount(FetchDescriptor<Activity>()),
                metrics: try context.fetchCount(FetchDescriptor<Metric>()),

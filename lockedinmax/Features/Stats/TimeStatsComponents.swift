@@ -11,7 +11,7 @@ struct TimeStatsBreakdown: View {
             if summary.breakdown.isEmpty { Text("No activity totals.").typography(.caption).foregroundStyle(Theme.textSecondary) }
             ForEach(summary.breakdown) { item in
                 if let activity = activities.first(where: { $0.id == item.id }) {
-                    NavigationLink { ActivityDetailView(activity: activity) } label: { row(item) }
+                    NavigationLink { ActivityDetailView(activityID: activity.id) } label: { row(item) }
                         .buttonStyle(.plain)
                 }
             }
@@ -66,7 +66,8 @@ struct TimeStatsInsights: View {
 
 struct ConsistencyHeatmap: View {
     let sessions: [Session]
-    @State private var selected: StatsAnalytics.HeatDay?
+    @State private var selectedDate: Date?
+    private var selected: StatsAnalytics.HeatDay? { days.first { $0.date == selectedDate } }
     @State private var days: [StatsAnalytics.HeatDay] = []
     private let labels = ["M", "", "W", "", "F", "", ""]
 
@@ -81,7 +82,7 @@ struct ConsistencyHeatmap: View {
                 weekdayLabels
                 LazyHGrid(rows: heatmapRows, spacing: 3) {
                     ForEach(days) { day in
-                        Button { selected = day } label: {
+                        Button { selectedDate = day.date } label: {
                             RoundedRectangle(cornerRadius: 3)
                                 .fill(day.level == 0 ? Theme.surface : Theme.accent.opacity(Double(day.level) * 0.22))
                                 .overlay(RoundedRectangle(cornerRadius: 3).stroke(Theme.hairline, lineWidth: day.level == 0 ? 1 : 0))
@@ -98,6 +99,9 @@ struct ConsistencyHeatmap: View {
         .task(id: "\(sessions.count)-\(DebugWorkState.generation)") {
             guard !DebugWorkState.isSeeding else { return }
             days = StatsAnalytics.heatmap(sessions: sessions, today: .now)
+            if let selectedDate, !days.contains(where: { $0.date == selectedDate }) {
+                self.selectedDate = nil
+            }
         }
     }
 

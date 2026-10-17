@@ -35,7 +35,7 @@ struct ScoreStatsView: View {
             } else {
                 SectionHeader(title: "METRICS")
                 ForEach(orderedMetrics) { metric in
-                    NavigationLink { MetricDetailView(metric: metric) } label: { row(metric) }
+                    NavigationLink { MetricDetailView(metricID: metric.id) } label: { row(metric) }
                         .buttonStyle(.plain)
                 }
             }
