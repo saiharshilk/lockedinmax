@@ -77,6 +77,8 @@ enum StatsAnalytics {
         let previousHours: Double
         let deltaHours: Double
         let deltaPercent: Double?
+        let comparisonCaption: String
+        let elapsedDays: Int
         let breakdown: [ActivitySlice]
         let activeDays: Int
         let daysSoFar: Int
@@ -133,13 +135,40 @@ enum StatsAnalytics {
         if DebugWorkState.isSeeding {
             let period = period(kind: kind, anchor: anchor, calendar: calendar)
             return Summary(period: period, bucketValues: [], totalHours: 0, previousHours: 0,
-                           deltaHours: 0, deltaPercent: nil, breakdown: [], activeDays: 0,
+                           deltaHours: 0, deltaPercent: nil, comparisonCaption: "", elapsedDays: 0, breakdown: [], activeDays: 0,
                            daysSoFar: 0, averagePerActiveDay: 0, bestDay: nil, topPosition: nil)
         }
 #endif
         let period = period(kind: kind, anchor: anchor, calendar: calendar)
+        let isCurrentPeriod = now >= period.start && now < period.end
         let current = sessions.filter { $0.hours.isFinite && $0.date >= period.start && $0.date < period.end && $0.date <= now }
-        let previous = sessions.filter { $0.hours.isFinite && $0.date >= period.previousStart && $0.date < period.previousEnd }
+        let elapsedDays: Int
+        if kind == .day {
+            elapsedDays = 1
+        } else if isCurrentPeriod {
+            elapsedDays = max(1, (calendar.dateComponents([.day], from: period.start,
+                                                         to: calendar.startOfDay(for: now)).day ?? 0) + 1)
+        } else {
+            elapsedDays = period.bucketDates.count
+        }
+        let previousEnd: Date
+        if isCurrentPeriod && kind != .day {
+            let previousPeriodEnd = period.start
+            let previousPeriodDays = calendar.dateComponents([.day], from: period.previousStart,
+                                                              to: previousPeriodEnd).day ?? elapsedDays
+            let matchedDays = min(elapsedDays, previousPeriodDays)
+            previousEnd = calendar.date(byAdding: .day, value: matchedDays, to: period.previousStart)
+                .map { min($0, previousPeriodEnd) } ?? previousPeriodEnd
+        } else {
+            previousEnd = period.previousEnd
+        }
+        let previous = sessions.filter { $0.hours.isFinite && $0.date >= period.previousStart && $0.date < previousEnd }
+        let comparisonCaption: String
+        switch kind {
+        case .day: comparisonCaption = "vs yesterday"
+        case .week: comparisonCaption = isCurrentPeriod ? "vs same days last week" : "vs previous week"
+        case .month: comparisonCaption = isCurrentPeriod ? "vs same days last month" : "vs previous month"
+        }
         var buckets: [Int: [UUID: Double]] = [:]
         var models: [UUID: Activity] = [:]
         var days: [Date: Double] = [:]
@@ -186,6 +215,7 @@ enum StatsAnalytics {
         }
         return Summary(period: period, bucketValues: chartValues, totalHours: total, previousHours: prior,
                        deltaHours: delta, deltaPercent: Analytics.percentChange(current: total, previous: prior),
+                       comparisonCaption: comparisonCaption, elapsedDays: isCurrentPeriod ? elapsedDays : period.bucketDates.count,
                        breakdown: breakdown, activeDays: active, daysSoFar: daysSoFar,
                        averagePerActiveDay: active > 0 ? total / Double(active) : 0,
                        bestDay: best, topPosition: breakdown.first)
@@ -202,10 +232,13 @@ enum StatsAnalytics {
     static func heatmap(sessions: [Session], today: Date, calendar: Calendar = .current) -> [HeatDay] {
         Analytics.recordRecompute()
         let end = calendar.startOfDay(for: today)
-        let first = calendar.date(byAdding: .day, value: -83, to: end) ?? end
+        let currentWeekStart = calendar.dateInterval(of: .weekOfYear, for: end)?.start ?? end
+        let first = calendar.date(byAdding: .weekOfYear, value: -11, to: currentWeekStart) ?? currentWeekStart
+        let currentWeekEnd = calendar.date(byAdding: .day, value: 6, to: currentWeekStart) ?? end
+        let heatmapEnd = calendar.date(byAdding: .day, value: 1, to: currentWeekEnd) ?? currentWeekEnd
         var totals: [Date: Double] = [:]
         var sessionGuard = LoopGuard("StatsAnalytics.heatmap.sessions")
-        for session in sessions where session.hours.isFinite && session.date >= first && session.date < (calendar.date(byAdding: .day, value: 1, to: end) ?? end) {
+        for session in sessions where session.hours.isFinite && session.date >= first && session.date < heatmapEnd {
             guard sessionGuard.next() else { break }
             let day = calendar.startOfDay(for: session.date)
             totals[day, default: 0] += Analytics.boundedHours(session.hours)

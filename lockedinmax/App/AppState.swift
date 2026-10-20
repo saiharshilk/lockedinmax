@@ -8,7 +8,7 @@ enum AppTab: Int, CaseIterable, Hashable {
     case recap
 }
 
-@Observable
+@Observable @MainActor
 final class AppState {
     @ObservationIgnored private var selectedTabStorage: AppTab = .home
 

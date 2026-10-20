@@ -28,11 +28,12 @@ struct HomeView: View {
             homeContent
 #endif
         }
-        .background(Theme.background.ignoresSafeArea())
+        .background(Theme.background)
 #if DEBUG
         .onChange(of: appState.sampleDataRefreshVersion) { _, _ in }
 #endif
         .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
 #if DEBUG
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -61,9 +62,12 @@ struct HomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
                 header
+                    .padding(.top, Theme.Spacing.md)
 
                 if sessions.isEmpty {
-                    HomeEmptyState { appState.selectedTab = .log }
+                    EmptyStateView(title: "Nothing on the board.",
+                                   message: "Log your first session to open your position.",
+                                   buttonTitle: "LOG A SESSION") { appState.selectedTab = .log }
                 } else {
                     TimeSeriesChartCard(sessions: sessions, label: "Time Invested",
                                         range: $range, mode: $mode)
@@ -75,6 +79,7 @@ struct HomeView: View {
             .padding(Theme.Spacing.xl)
             .padding(.bottom, Theme.Spacing.xxl)
         }
+        .tabBarClearance()
     }
 
     private var header: some View {

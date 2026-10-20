@@ -26,15 +26,16 @@ struct SessionCard: View {
                 CardHeader(date: data.session.date)
                 Spacer(minLength: Theme.Spacing.sm)
                 Text(data.session.activityName)
-                    .font(.system(size: 42, weight: .semibold, design: .serif))
+                    .font(Theme.Fonts.serif(size: 42, relativeTo: .largeTitle))
                     .foregroundStyle(Theme.accent).lineLimit(2).minimumScaleFactor(0.55)
+                    .accessibilityAddTraits(.isHeader)
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.md) {
                     Text(Formatters.hours(data.session.hours))
-                        .font(.system(size: 30, weight: .medium, design: .monospaced))
+                        .font(Theme.Fonts.mono(size: 30, weight: .medium, relativeTo: .largeTitle))
                         .foregroundStyle(Theme.textPrimary).lineLimit(1).minimumScaleFactor(0.7)
                     if let delta {
-                        Text("\(delta >= 0 ? "▲" : "▼") \(abs(delta).formatted(.number.precision(.fractionLength(0))))% vs avg")
+                        Text("\(delta >= 0 ? "▲" : "▼") \(Formatters.percent(delta)) vs avg")
                             .typography(.caption).foregroundStyle(delta >= 0 ? Theme.up : Theme.down)
                             .lineLimit(1).minimumScaleFactor(0.6)
                     }
@@ -51,6 +52,7 @@ struct SessionCard: View {
         }
         .frame(width: data.format.size.width, height: data.format.size.height)
         .clipped().background(Theme.background)
+        .accessibilityElement(children: .combine)
     }
 
     @ViewBuilder private var background: some View {

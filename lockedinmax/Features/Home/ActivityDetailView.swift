@@ -34,7 +34,7 @@ struct ActivityDetailView: View {
             if DebugWorkState.isSeeding {
                 ProgressView("Loading sample data...").tint(Theme.accent)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Theme.background.ignoresSafeArea())
+                    .background(Theme.background)
             } else if activity != nil {
                 activityContent
             } else {
@@ -92,13 +92,16 @@ struct ActivityDetailView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(Theme.background.ignoresSafeArea())
+        .tabBarClearance()
+        .background(Theme.background)
         .listRowSeparator(.hidden)
         .navigationBarBackButtonHidden()
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button { dismiss() } label: {
                     Image(systemName: "chevron.left").foregroundStyle(Theme.accent)
+                        .frame(width: Theme.minimumTapHeight, height: Theme.minimumTapHeight)
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Back")
             }
@@ -110,11 +113,14 @@ struct ActivityDetailView: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis").foregroundStyle(Theme.accent)
+                        .frame(width: Theme.minimumTapHeight, height: Theme.minimumTapHeight)
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Activity options")
             }
         }
         .tint(Theme.accent)
+        .toolbar(.visible, for: .navigationBar)
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .activity:
@@ -187,14 +193,10 @@ struct ActivityDetailView: View {
     }
 
     private var emptyState: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-            Text("No sessions yet.").typography(.title).foregroundStyle(Theme.textPrimary)
-            PrimaryButton(title: "LOG A SESSION") {
-                appState.sessionActivityID = activityID
-                appState.selectedTab = .log
-            }
+        EmptyStateView(title: "No sessions yet.", message: "", buttonTitle: "LOG A SESSION") {
+            appState.sessionActivityID = activityID
+            appState.selectedTab = .log
         }
-        .padding(.vertical, Theme.Spacing.xl)
         .listRowBackground(Theme.background)
     }
 

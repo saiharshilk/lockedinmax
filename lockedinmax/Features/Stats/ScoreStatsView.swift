@@ -34,12 +34,15 @@ struct ScoreStatsView: View {
                 emptyState
             } else {
                 SectionHeader(title: "METRICS")
-                ForEach(orderedMetrics) { metric in
-                    NavigationLink { MetricDetailView(metricID: metric.id) } label: { row(metric) }
+                    .accessibilityAddTraits(.isHeader)
+                ForEach(orderedMetrics, id: \.id) { metric in
+                    NavigationLink(value: StatsDestination.metric(metric.id)) { row(metric) }
                         .buttonStyle(.plain)
+
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func row(_ metric: Metric) -> some View {
@@ -52,7 +55,8 @@ struct ScoreStatsView: View {
                 Text(metric.name).typography(.rowTitle).foregroundStyle(Theme.textPrimary)
                 if let change = recentChange(summary.entries) {
                     DeltaLabel(value: change,
-                               text: Formatters.metricDelta(change) + (metric.unit.isEmpty ? "" : " \(metric.unit)"))
+                               text: Formatters.metricDelta(change) + (metric.unit.isEmpty ? "" : " \(metric.unit)"),
+                               neutralText: "0.0\(metric.unit.isEmpty ? "" : " \(metric.unit)")")
                 }
             }
             Spacer(minLength: Theme.Spacing.sm)
@@ -67,6 +71,15 @@ struct ScoreStatsView: View {
         }
         .padding(.vertical, Theme.Spacing.md)
         .overlay(alignment: .bottom) { Rectangle().fill(Theme.hairline).frame(height: 1) }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(metric.name), \(summaryText(metric))")
+    }
+
+    private func summaryText(_ metric: Metric) -> String {
+        let entries = self.entries.filter { $0.metric?.id == metric.id }
+        guard let latest = entries.max(by: { $0.date < $1.date }) else { return "No scores yet" }
+        let count = entries.count
+        return "Latest \(Formatters.metric(latest.value, unit: metric.unit)), \(count) \(count == 1 ? "entry" : "entries")"
     }
 
     private func recentChange(_ sortedEntries: [MetricEntry]) -> Double? {
@@ -79,15 +92,12 @@ struct ScoreStatsView: View {
     }
 
     private var emptyState: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-            Text("No scores yet.").typography(.title).foregroundStyle(Theme.textPrimary)
-            Text("Log a score with a screenshot to start tracking it.")
-                .typography(.body).foregroundStyle(Theme.textSecondary)
-            PrimaryButton(title: "LOG A SCORE") {
-                appState.logScoreRequested = true
-                appState.selectedTab = .log
-            }
-        }.padding(.vertical, Theme.Spacing.xxl)
+        EmptyStateView(title: "No scores yet.",
+                       message: "Log a score with a screenshot to start tracking it.",
+                       buttonTitle: "LOG A SCORE") {
+            appState.logScoreRequested = true
+            appState.selectedTab = .log
+        }
     }
 }
 

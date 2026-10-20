@@ -9,6 +9,8 @@ struct LogView: View {
         List {
             VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
                 Text("Log").typography(.title).foregroundStyle(Theme.textPrimary)
+                    .padding(.top, Theme.Spacing.md)
+                    .accessibilityAddTraits(.isHeader)
                 LogSegmentControl(isScore: $isScore)
                 if isScore {
                     ScoreLogForm()
@@ -24,7 +26,7 @@ struct LogView: View {
                     .listRowBackground(Theme.background)
                     .listRowSeparatorTint(Theme.hairline)
             } header: {
-                SectionHeader(title: "RECENT")
+                SectionHeader(title: "RECENT").accessibilityAddTraits(.isHeader)
             }
 #if DEBUG
             Section {
@@ -35,8 +37,11 @@ struct LogView: View {
 #endif
         }
         .listStyle(.plain)
+        .tabBarClearance()
         .scrollContentBackground(.hidden)
         .background(Theme.background)
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
         .tint(Theme.accent)
         .onAppear(perform: consumeScoreRequest)

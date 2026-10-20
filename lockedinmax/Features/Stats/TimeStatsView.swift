@@ -14,6 +14,7 @@ struct TimeStatsView: View {
     @State private var anchor = Date.now
     @State private var selectedBucket: Int?
     @State private var selectionTick = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var summary: StatsAnalytics.Summary {
         StatsAnalytics.summarize(sessions: sessions, kind: kind, anchor: anchor, now: .now)
@@ -53,16 +54,24 @@ struct TimeStatsView: View {
             } else {
                 VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
                     StatsSegments(selection: periodSegment)
+                        .frame(maxWidth: .infinity)
                     navigator
-                    summaryHeader
+                    summaryHeader.frame(maxWidth: .infinity, alignment: .leading)
                     if summary.totalHours == 0 { Text("No sessions this period").typography(.caption).foregroundStyle(Theme.textSecondary) }
                     stackedChart
+                        .frame(maxWidth: .infinity)
+                        .accessibilityLabel("Time invested stacked bar chart for \(kind.rawValue.lowercased()) period")
+                        .accessibilityValue("\(summary.bucketValues.count) activity buckets; total \(Formatters.hours(summary.totalHours))")
                     TimeStatsBreakdown(summary: summary, activities: activities)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     TimeStatsInsights(summary: summary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     ConsistencyHeatmap(sessions: sessions)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .animation(.easeInOut(duration: 0.2), value: kind)
-                .animation(.easeInOut(duration: 0.2), value: anchor)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: kind)
+                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: anchor)
             }
         }
     }
@@ -70,14 +79,19 @@ struct TimeStatsView: View {
     private var navigator: some View {
         HStack {
             Button { move(-1) } label: { Image(systemName: "chevron.left") }
+                .frame(width: Theme.minimumTapHeight, height: Theme.minimumTapHeight)
+                .contentShape(Rectangle()).accessibilityLabel("Previous period")
             Spacer()
             Text(periodLabel).typography(.sectionLabel).foregroundStyle(Theme.textPrimary)
             Spacer()
             Button { move(1) } label: { Image(systemName: "chevron.right") }
+                .frame(width: Theme.minimumTapHeight, height: Theme.minimumTapHeight)
+                .contentShape(Rectangle()).accessibilityLabel("Next period")
                 .disabled(isCurrentPeriod).opacity(isCurrentPeriod ? 0.3 : 1)
         }
-        .font(.system(size: 14, weight: .semibold, design: .monospaced))
+        .font(Theme.Fonts.mono(size: 14, weight: .semibold, relativeTo: .body))
         .foregroundStyle(Theme.accent)
+        .frame(maxWidth: .infinity)
     }
 
     private var periodLabel: String {
@@ -89,13 +103,23 @@ struct TimeStatsView: View {
             Text("TIME INVESTED").typography(.sectionLabel).foregroundStyle(Theme.textTertiary)
             HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
                 Text(Formatters.hoursValue(summary.totalHours)).typography(.heroNumber).foregroundStyle(Theme.textPrimary)
+                    .lineLimit(1).minimumScaleFactor(0.65)
                 Text(Formatters.hoursUnit(summary.totalHours)).typography(.body).foregroundStyle(Theme.textSecondary)
             }
-            if summary.deltaPercent != nil || summary.deltaHours != 0 {
-                DeltaLabel(value: summary.deltaHours,
-                           text: "\(Formatters.delta(hours: summary.deltaHours, percent: summary.deltaPercent)) vs previous")
-            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(summaryAccessibility)
+            .accessibilityValue(Formatters.hours(summary.totalHours))
+            DeltaLabel(value: summary.deltaHours,
+                       text: "\(Formatters.delta(hours: summary.deltaHours, percent: summary.deltaPercent))")
+            Text(summary.comparisonCaption).typography(.caption).foregroundStyle(Theme.textSecondary)
         }
+    }
+
+    private var summaryAccessibility: String {
+        guard abs(summary.deltaHours) >= 0.005 else {
+            return "\(Formatters.hours(summary.totalHours)), time invested"
+        }
+        return "\(Formatters.hours(summary.totalHours)), \(summary.deltaHours > 0 ? "up" : "down") \(Formatters.hours(abs(summary.deltaHours))) \(summary.comparisonCaption)"
     }
 
     private var stackedChart: some View {
@@ -141,6 +165,7 @@ struct TimeStatsView: View {
                         }.onEnded { _ in selectedBucket = nil })
                 }
             }
+            .frame(maxWidth: .infinity)
             .frame(height: chartHeight)
             .clipped()
     }
@@ -200,11 +225,9 @@ struct TimeStatsView: View {
     }
 
     private var emptyState: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-            Text("Nothing on the board.").typography(.title).foregroundStyle(Theme.textPrimary)
-            Text("Log your time to see your portfolio take shape.").typography(.body).foregroundStyle(Theme.textSecondary)
-            PrimaryButton(title: "LOG A SESSION") { appState.selectedTab = .log }
-        }.padding(.vertical, Theme.Spacing.xxl)
+        EmptyStateView(title: "Nothing on the board.",
+                       message: "Log your time to see your portfolio take shape.",
+                       buttonTitle: "LOG A SESSION") { appState.selectedTab = .log }
     }
 
     private func move(_ offset: Int) {

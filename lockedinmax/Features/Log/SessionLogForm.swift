@@ -45,6 +45,7 @@ struct SessionLogForm: View {
             applyPrefilledActivity()
         }
         .sensoryFeedback(.impact(weight: .light), trigger: saveCount)
+        .toolbar { KeyboardDoneToolbar() }
         .alert("Could not save session", isPresented: Binding(
             get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
         )) { Button("OK", role: .cancel) {} } message: { Text(errorMessage ?? "") }

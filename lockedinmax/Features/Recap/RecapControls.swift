@@ -19,7 +19,10 @@ struct RecapModeControl: View {
                 .frame(maxWidth: .infinity, minHeight: Theme.minimumTapHeight)
                 .background(isSelected ? Theme.accent : Theme.surface,
                             in: RoundedRectangle(cornerRadius: Theme.Radius.small))
-        }.buttonStyle(.plain).accessibilityAddTraits(isSelected ? .isSelected : [])
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
@@ -38,16 +41,19 @@ struct RecapValuePicker<Option: RawRepresentable & CaseIterable & Identifiable &
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-            Text(title).typography(.sectionLabel).foregroundStyle(Theme.textTertiary)
+        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {                Text(title).typography(.sectionLabel).foregroundStyle(Theme.textTertiary)
             HStack(spacing: Theme.Spacing.xs) {
                 ForEach(options) { option in
                     Button { selection = option } label: {
                         Text(option.rawValue).typography(.caption).lineLimit(1).minimumScaleFactor(0.7)
                             .foregroundStyle(selection == option ? Theme.onAccent : Theme.textSecondary)
-                            .padding(.horizontal, Theme.Spacing.sm).padding(.vertical, Theme.Spacing.sm)
+                            .padding(.horizontal, Theme.Spacing.sm).frame(minHeight: Theme.minimumTapHeight)
                             .background(selection == option ? Theme.accent : Theme.surface, in: Capsule())
-                    }.buttonStyle(.plain).disabled(disabledOptions.contains(option))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(title) \(option.rawValue)")
+                    .accessibilityAddTraits(selection == option ? .isSelected : [])
+                    .disabled(disabledOptions.contains(option))
                 }
             }
         }

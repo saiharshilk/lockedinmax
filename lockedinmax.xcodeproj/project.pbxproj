@@ -10,9 +10,22 @@
 		461B4C8130787FBF005DC258 /* lockedinmax.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = lockedinmax.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		4688212630854F8E006C136C /* Exceptions for "lockedinmax" folder in "lockedinmax" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 461B4C8030787FBF005DC258 /* lockedinmax */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		461B4C8330787FBF005DC258 /* lockedinmax */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				4688212630854F8E006C136C /* Exceptions for "lockedinmax" folder in "lockedinmax" target */,
+			);
 			path = lockedinmax;
 			sourceTree = "<group>";
 		};
@@ -240,6 +253,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = lockedinmax/Info.plist;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -282,6 +296,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = lockedinmax/Info.plist;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;

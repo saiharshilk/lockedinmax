@@ -9,17 +9,17 @@ enum Typography {
         var font: Font {
             switch self {
             case .heroNumber:
-                .system(size: 48, weight: .semibold, design: .monospaced)
+                Theme.Fonts.mono(size: 48, weight: .semibold, relativeTo: .largeTitle)
             case .title:
-                .system(size: 30, weight: .semibold, design: .serif)
+                Theme.Fonts.serif(size: 30, relativeTo: .title)
             case .sectionLabel:
-                .system(size: 11, design: .monospaced)
+                Theme.Fonts.mono(size: 11, relativeTo: .caption)
             case .rowTitle:
-                .system(size: 13, weight: .semibold, design: .monospaced)
+                Theme.Fonts.mono(size: 13, weight: .semibold, relativeTo: .subheadline)
             case .body:
-                .system(size: 15, design: .monospaced)
+                Theme.Fonts.mono(size: 15, relativeTo: .body)
             case .caption:
-                .system(size: 12, design: .monospaced)
+                Theme.Fonts.mono(size: 12, relativeTo: .caption)
             }
         }
 

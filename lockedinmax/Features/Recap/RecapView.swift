@@ -49,8 +49,9 @@ struct RecapView: View {
             recapContent
 #endif
         }
-        .background(Theme.background.ignoresSafeArea())
-        .navigationTitle("").navigationBarTitleDisplayMode(.inline)
+        .background(Theme.background)
+        .tabBarClearance()
+        .toolbar(.hidden, for: .navigationBar)
         .onAppear(perform: consumeRoute)
         .onChange(of: appState.sessionRecapID) { _, _ in consumeRoute() }
         .onChange(of: sessions.count) { _, _ in selectDefaultSession(); renderExport() }
@@ -58,11 +59,13 @@ struct RecapView: View {
             if let selectedSessionID, !ids.contains(selectedSessionID) { self.selectedSessionID = nil }
             if let routeID = appState.sessionRecapID, !ids.contains(routeID) { appState.sessionRecapID = nil }
         }
+#if DEBUG
         .onChange(of: DebugWorkState.generation) { _, _ in
             if let selectedSessionID, !sessions.contains(where: { $0.id == selectedSessionID }) {
                 self.selectedSessionID = nil
             }
         }
+#endif
         .onChange(of: metrics.count) { _, _ in renderExport() }
         .onChange(of: renderKey) { _, _ in renderExport() }
         .onChange(of: metrics.map(\.id)) { _, _ in renderExport() }
@@ -72,6 +75,8 @@ struct RecapView: View {
             renderExport()
         }
         .onChange(of: caption) { _, _ in renderExport() }
+        .scrollDismissesKeyboard(.interactively)
+        .toolbar { KeyboardDoneToolbar() }
         .onChange(of: marketClose) { _, _ in renderExport() }
         .onChange(of: selectedDay) { _, _ in renderExport() }
         .onChange(of: format) { _, _ in renderExport() }
@@ -79,10 +84,14 @@ struct RecapView: View {
 #if DEBUG
         .onChange(of: appState.sampleDataRefreshVersion) { _, _ in renderExport() }
 #endif
+#if DEBUG
         .task(id: DebugWorkState.generation) {
             guard !DebugWorkState.isSeeding else { return }
             renderExport()
         }
+#else
+        .task { renderExport() }
+#endif
         .tint(Theme.accent)
     }
 
@@ -90,6 +99,8 @@ struct RecapView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                 Text("Recap").typography(.title).foregroundStyle(Theme.textPrimary)
+                    .padding(.top, Theme.Spacing.md)
+                    .accessibilityAddTraits(.isHeader)
                 RecapModeControl(marketClose: $marketClose)
                 if sessions.isEmpty { emptyState }
                 else {
@@ -121,13 +132,18 @@ struct RecapView: View {
                 ForEach(recentSessions) { session in
                     Button { selectedSessionID = session.id } label: {
                         VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                            Text(session.activity?.name ?? "Session").lineLimit(1).minimumScaleFactor(0.7)
-                            Text("\(Formatters.hours(session.hours)) · \(session.date.formatted(.dateTime.day().month(.abbreviated)))")
-                                .lineLimit(1).minimumScaleFactor(0.7)
+                            Text(session.activity?.name ?? "Session").lineLimit(1).truncationMode(.tail)
+                            HStack(spacing: Theme.Spacing.xs) {
+                                Text(Formatters.hours(session.hours)).fixedSize().layoutPriority(1)
+                                Text("· \(session.date.formatted(.dateTime.day().month(.abbreviated)))")
+                                    .lineLimit(1).minimumScaleFactor(0.7)
+                            }
                         }
                         .typography(.caption)
                         .foregroundStyle(session.id == selectedSession?.id ? Theme.onAccent : Theme.textSecondary)
+                        .frame(maxWidth: 180, alignment: .leading)
                         .padding(Theme.Spacing.md)
+                        .frame(minHeight: Theme.minimumTapHeight)
                         .background(session.id == selectedSession?.id ? Theme.accent : Theme.surface,
                                     in: RoundedRectangle(cornerRadius: Theme.Radius.medium))
                     }.buttonStyle(.plain)
@@ -167,11 +183,9 @@ struct RecapView: View {
     }
 
     private var emptyState: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-            Text("Nothing to share yet.").typography(.title).foregroundStyle(Theme.textPrimary)
-            Text("Log a session and your recap card shows up here.").typography(.body).foregroundStyle(Theme.textSecondary)
-            PrimaryButton(title: "LOG A SESSION") { appState.selectedTab = .log }
-        }.padding(.vertical, Theme.Spacing.xl)
+        EmptyStateView(title: "Nothing to share yet.",
+                       message: "Log a session and your recap card shows up here.",
+                       buttonTitle: "LOG A SESSION") { appState.selectedTab = .log }
     }
 
     private var renderKey: String {

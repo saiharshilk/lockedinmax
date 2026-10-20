@@ -15,9 +15,12 @@ struct RecapMarketPicker: View {
                             Text(day.formatted(.dateTime.day().month(.abbreviated)).uppercased())
                                 .typography(.caption)
                                 .foregroundStyle(Calendar.current.isDate(day, inSameDayAs: selectedDay) ? Theme.onAccent : Theme.textSecondary)
-                                .padding(.horizontal, Theme.Spacing.md).padding(.vertical, Theme.Spacing.sm)
+                                .padding(.horizontal, Theme.Spacing.md).frame(minHeight: Theme.minimumTapHeight)
                                 .background(Calendar.current.isDate(day, inSameDayAs: selectedDay) ? Theme.accent : Theme.surface, in: Capsule())
-                        }.buttonStyle(.plain)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(day.formatted(.dateTime.weekday(.wide).day().month(.wide)))
+                        .accessibilityAddTraits(Calendar.current.isDate(day, inSameDayAs: selectedDay) ? .isSelected : [])
                     }
                 }
             }

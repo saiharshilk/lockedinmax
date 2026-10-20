@@ -45,7 +45,7 @@ Task 6f simulator verification (iPhone 18 Pro, iOS 27.0): Debug build and `build
 Audit inventory: the sole SwiftData notification observer is `Features/Log/DebugDiagnostics.swift` `ModelContext.didSave`; it does not resolve identifiers into models. `Session`, `Activity`, `Metric`, and `MetricEntry` references in query-backed views/one-action callbacks remain transient; saved navigation/edit selection is UUID-based. Deletion behavior and remaining query-scoped model references are detailed in the Task 6f audit below.
 
 
-DONE: Tasks 1 to 6. Task 6b adds session-hours validation (finite, >0 and <=24), bounded sample hours, and analytics safeguards for invalid/oversized stored hours. Metric-entry writes require finite numeric input.
+DONE: Tasks 1 to 7. Task 6b adds session-hours validation (finite, >0 and <=24), bounded sample hours, and analytics safeguards for invalid/oversized stored hours. Metric-entry writes require finite numeric input.
 
 Task 6 adds 360x450 and 360x640 Session and Market Close cards rendered at 3x, with dark/photo session backgrounds, deterministic skyline, header/ticker, activities and score summaries, live Recap controls and SwiftUI ShareLink export. Activity detail can route a selected session into Recap. DEBUG sample data now includes seven positions, very long text, photos, a high-hour day, and multiple same-day Sleep Score entries.
 
@@ -59,7 +59,11 @@ Task 6d: the DEBUG sample generator is deterministic and bounded at 171 sessions
 
 Task 6d verification: iPhone 18 Pro simulator build succeeded. The DEBUG launch argument `--sample-data-self-check` passed in the running simulator: first run and replacement run each reported sessions=171, activities=7, metrics=3, entries=75; invalid hours=0. The prior empty-database recap Self-test failure was caused by its `no session available` early return, rather than an observed SwiftData change. Manual checks of the DESIGN-sheet Self-test, replacement confirmation, and loading state remain.
 
-DONE: Task 7 remains NEXT (app icon, launch screen, empty states, custom fonts); lower-is-better metrics and a weekly recap are future options.
+Task 7: Polish, fixes, fonts, icon, launch — DONE. Shared tab-bar clearance, consistent custom serif page titles, round-half-up two-decimal hours formatting, constrained position rows, four-letter recap ticker abbreviations, single AppState tab selection, keyboard Done toolbars, reusable empty states, custom font registration with system fallbacks, Dynamic Type cap, 1024px app icon variants, launch background color asset, cold-launch splash, accessibility summaries/hit areas, and Reduce Motion support are implemented. Diagnostics, counters, data tools, and sample/test code remain DEBUG-only; DESIGN remains a DEBUG-only Home toolbar action.
+
+Task 7 verification: JetBrains Mono Regular/Medium/SemiBold (official JetBrains Mono v2.304 release) and Playfair Display variable (official Google Fonts `ofl/playfairdisplay`) were downloaded to `lockedinmax/Resources/Fonts/` with both OFL licenses. The AppIcon catalog uses `AppIcon.png`, `AppIcon-dark.png`, and `AppIcon-tinted.png` (1024×1024 sRGB RGB PNGs; tinted is grayscale on black); target build setting is `AppIcon`. Launch background is #1C180D. Debug and Release simulator builds succeeded. Xcode continues to emit its existing AppIntents metadata warning because there is no AppIntents dependency; no Swift compile warnings remain after cleanup. The DEBUG simulator app should be tested at Home → DESIGN → Data Diagnostics; Self-test, Churn test, and analytics sweep controls retain their existing behavior. The last full in-app churn run remains the Task 6f verification above.
+
+Lower-is-better metrics and a weekly recap are future options.
 
 ### Task 6f audit details
 

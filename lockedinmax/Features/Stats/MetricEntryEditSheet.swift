@@ -40,7 +40,7 @@ struct MetricEntryEditSheet: View {
                         .disabled(LogInput.positiveNumber(value) == nil || isLoading)
                 }.padding(Theme.Spacing.lg)
             }
-            .background(Theme.background.ignoresSafeArea())
+            .background(Theme.background)
             .navigationTitle("Edit Score").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
             .alert("Could not save entry", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
@@ -54,6 +54,8 @@ struct MetricEntryEditSheet: View {
         .onChange(of: entries.map(\.id)) { _, ids in
             if !ids.contains(entryID) { dismiss() }
         }
+        .scrollDismissesKeyboard(.interactively)
+        .toolbar { KeyboardDoneToolbar() }
         .tint(Theme.accent).preferredColorScheme(.dark)
     }
 

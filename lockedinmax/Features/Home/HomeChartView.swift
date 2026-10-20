@@ -7,6 +7,7 @@ struct HomeChartView: View {
     let mode: ChartMode
     @Binding var selectedDate: Date?
     let selectedPoint: Analytics.ChartPoint?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var points: [Analytics.ChartPoint] {
         mode == .cumulative ? summary.cumulative : summary.buckets
@@ -88,8 +89,8 @@ struct HomeChartView: View {
         }
         .chartLegend(.hidden)
         .chartYScale(domain: 0...yMaximum)
-        .animation(.easeInOut(duration: 0.2), value: range)
-        .animation(.easeInOut(duration: 0.2), value: mode)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: range)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: mode)
         .frame(height: 190)
         .clipped()
     }

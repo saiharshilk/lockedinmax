@@ -31,7 +31,7 @@ struct MetricEditSheet: View {
                 PrimaryButton(title: "SAVE CHANGES", action: save)
                     .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 Spacer()
-            }.padding(Theme.Spacing.lg).background(Theme.background.ignoresSafeArea())
+            }.padding(Theme.Spacing.lg).background(Theme.background)
                 .navigationTitle("Edit Metric").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
                 .alert("Could not save metric", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
@@ -45,6 +45,8 @@ struct MetricEditSheet: View {
         .onChange(of: metrics.map(\.id)) { _, ids in
             if !ids.contains(metricID) { dismiss() }
         }
+        .scrollDismissesKeyboard(.interactively)
+        .toolbar { KeyboardDoneToolbar() }
         .tint(Theme.accent).preferredColorScheme(.dark)
     }
 

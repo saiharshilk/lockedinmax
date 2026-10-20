@@ -11,10 +11,12 @@ struct StatsSegments<Value: Hashable & CaseIterable & RawRepresentable>: View wh
                         .typography(.rowTitle)
                         .foregroundStyle(selection == value ? Theme.onAccent : Theme.textSecondary)
                         .frame(maxWidth: .infinity, minHeight: Theme.minimumTapHeight)
+                        .contentShape(Rectangle())
                         .background(selection == value ? Theme.accent : Theme.surface,
                                     in: RoundedRectangle(cornerRadius: Theme.Radius.small))
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(value.rawValue)
                 .accessibilityAddTraits(selection == value ? .isSelected : [])
             }
         }

@@ -36,18 +36,29 @@ struct MetricDetailView: View {
             else { ContentUnavailableView("Metric deleted", systemImage: "trash").task { dismiss() } }
 #endif
         }
-        .background(Theme.background.ignoresSafeArea())
+        .background(Theme.background)
+        .tabBarClearance()
         .navigationBarBackButtonHidden()
+        .toolbar(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
-                Button { dismiss() } label: { Image(systemName: "chevron.left").foregroundStyle(Theme.accent) }
+                Button { dismiss() } label: {
+                    Image(systemName: "chevron.left").foregroundStyle(Theme.accent)
+                        .frame(width: Theme.minimumTapHeight, height: Theme.minimumTapHeight)
+                        .contentShape(Rectangle())
+                }
                     .accessibilityLabel("Back")
             }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
                     Button("Edit metric", systemImage: "pencil") { activeSheet = .metric }
                     Button("Delete metric", systemImage: "trash", role: .destructive) { confirmingDelete = true }
-                } label: { Image(systemName: "ellipsis").foregroundStyle(Theme.accent) }
+                } label: {
+                    Image(systemName: "ellipsis").foregroundStyle(Theme.accent)
+                        .frame(width: Theme.minimumTapHeight, height: Theme.minimumTapHeight)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("Metric options")
             }
         }
         .sheet(item: $activeSheet) { sheet in
@@ -89,8 +100,7 @@ struct MetricDetailView: View {
             VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
                 header
                 if entries.isEmpty {
-                    Text("No entries yet.").typography(.body).foregroundStyle(Theme.textSecondary)
-                        .padding(.vertical, Theme.Spacing.xl)
+                    EmptyStateView(title: "No entries yet.", message: "", buttonTitle: "") {}
                 } else {
                     if let metric { MetricChartCard(metric: metric, entries: entries, range: $range) }
                     statsGrid
@@ -104,8 +114,11 @@ struct MetricDetailView: View {
                             }
                     }
                 }
-            }.padding(Theme.Spacing.lg).padding(.bottom, Theme.Spacing.xxl)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(Theme.Spacing.lg).padding(.bottom, Theme.Spacing.xxl)
         }
+        .scrollIndicators(.hidden)
     }
 
     private var header: some View {

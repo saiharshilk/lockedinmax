@@ -34,6 +34,7 @@ struct ScoreLogForm: View {
         }
         .sheet(isPresented: $showingNew) { NewMetricSheet { metricID = $0 } }
         .sensoryFeedback(.impact(weight: .light), trigger: saveCount)
+        .toolbar { KeyboardDoneToolbar() }
         .onChange(of: metrics.map(\.id)) { _, ids in
             if let metricID, !ids.contains(metricID) { self.metricID = nil }
         }

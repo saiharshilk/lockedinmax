@@ -43,18 +43,39 @@ struct HomePositions: View {
             }
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                 Text(position.name).typography(.rowTitle).foregroundStyle(Theme.textPrimary)
+                    .lineLimit(1).truncationMode(.tail).layoutPriority(1)
                 Text(Formatters.hours(position.hours)).typography(.caption).foregroundStyle(Theme.textSecondary)
             }
-            Spacer(minLength: Theme.Spacing.sm)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
             Sparkline(values: downsampled(position.id),
-                      color: (position.deltaHours ?? 0) >= 0 ? Theme.up : Theme.down)
-            if let delta = position.deltaHours {
-                DeltaLabel(value: delta, text: Formatters.delta(hours: delta, percent: position.deltaPercent))
-                    .minimumScaleFactor(0.75)
+                      color: (position.deltaHours ?? 0) >= 0 ? Theme.up : Theme.down,
+                      size: CGSize(width: 56, height: 22))
+                .frame(width: 56, height: 22)
+                .layoutPriority(0)
+            VStack(alignment: .trailing, spacing: Theme.Spacing.xs) {
+                if let delta = position.deltaHours {
+                    if abs(delta) < 0.005 {
+                        Text("0.0 hrs").typography(.caption).foregroundStyle(Theme.textSecondary)
+                            .lineLimit(1).minimumScaleFactor(0.75)
+                    } else {
+                        Text("\(delta > 0 ? "+" : "−")\(Formatters.hours(abs(delta)))").typography(.caption)
+                            .lineLimit(1).minimumScaleFactor(0.75)
+                        if let percent = position.deltaPercent {
+                            Text(Formatters.percent(percent)).typography(.caption)
+                                .lineLimit(1).minimumScaleFactor(0.75)
+                        }
+                    }
+                } else {
+                    Text("—").typography(.caption)
+                }
             }
+            .frame(width: 96, alignment: .trailing)
+            .layoutPriority(1)
         }
         .padding(.vertical, Theme.Spacing.md)
         .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(position.name), \(Formatters.hours(position.hours))\(position.deltaHours.map { abs($0) < 0.005 ? ", unchanged" : ", \($0 > 0 ? "up" : "down") \(Formatters.hours(abs($0))) versus previous period" } ?? "")")
     }
 
     private func downsampled(_ id: UUID) -> [Double] {
@@ -68,11 +89,13 @@ struct HomePositions: View {
 }
 
 private struct PositionRowButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.985 : 1)
             .opacity(configuration.isPressed ? 0.82 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 

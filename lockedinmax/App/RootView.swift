@@ -44,6 +44,7 @@ struct RootView: View {
         .foregroundStyle(Theme.textPrimary)
         .background(Theme.background.ignoresSafeArea())
         .preferredColorScheme(.dark)
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .onChange(of: appState.navigationResetVersion) { _, _ in
             homePath = NavigationPath()
             statsPath = NavigationPath()
@@ -60,6 +61,9 @@ struct RootView: View {
             if arguments.contains("--analytics-sweep") {
                 NSLog("[AnalyticsSweepArgument] %@", AnalyticsSweep.runAnalyticsSweep().description)
             }
+            if arguments.contains("--stats-self-check") {
+                NSLog("[StatsSelfCheck] %@", StatsAnalyticsSelfCheck.run())
+            }
             if arguments.contains("--churn-test") && !didRunChurnTest {
                 didRunChurnTest = true
                 await DebugDataOperations.launchChurnTestIfRequested(in: modelContext, appState: appState)
@@ -73,7 +77,7 @@ struct RootView: View {
         NavigationStack(path: path) {
             content()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Theme.background.ignoresSafeArea())
+                .background(Theme.background)
 #if os(iOS)
                 .toolbarBackground(Theme.background, for: .navigationBar, .tabBar)
                 .toolbarBackground(.visible, for: .navigationBar, .tabBar)

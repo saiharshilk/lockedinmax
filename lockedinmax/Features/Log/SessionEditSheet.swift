@@ -48,7 +48,7 @@ struct SessionEditSheet: View {
                 }
                 .padding(Theme.Spacing.lg)
             }
-            .background(Theme.background.ignoresSafeArea())
+            .background(Theme.background)
             .navigationTitle("Edit Session")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
@@ -64,6 +64,8 @@ struct SessionEditSheet: View {
         .onChange(of: sessions.map(\.id)) { _, ids in
             if !ids.contains(sessionID) { dismiss() }
         }
+        .scrollDismissesKeyboard(.interactively)
+        .toolbar { KeyboardDoneToolbar() }
         .tint(Theme.accent).preferredColorScheme(.dark)
     }
 

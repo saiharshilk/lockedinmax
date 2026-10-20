@@ -26,10 +26,20 @@ struct HomeSummaryView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilitySummary)
+        .accessibilityValue(Formatters.hours(value))
     }
 
     private var value: Double { point?.value ?? summary.currentHours }
+
+    private var accessibilitySummary: String {
+        guard point == nil, let delta = summary.deltaHours else {
+            return "\(Formatters.hours(value)), selected chart point"
+        }
+        guard abs(delta) >= 0.005 else { return "\(Formatters.hours(value)), time invested, unchanged" }
+        return "\(Formatters.hours(value)), \(delta > 0 ? "up" : "down") \(Formatters.hours(abs(delta))) versus previous period"
+    }
 
     private var label: String {
         if let point {

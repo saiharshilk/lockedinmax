@@ -34,6 +34,7 @@ struct PhotoInput: View {
                 }
             }
             .buttonStyle(.plain)
+            .frame(minHeight: Theme.minimumTapHeight)
             .accessibilityLabel(title)
             if data != nil || isLoading {
                 Button("Remove image", systemImage: "xmark.circle") {

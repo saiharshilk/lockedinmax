@@ -15,6 +15,7 @@ struct TimeSeriesChartCard: View {
     @State private var selectedPointID: Int?
     private var selectedPoint: Analytics.ChartPoint? { points.first { $0.id == selectedPointID } }
     @State private var scrubTrigger = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var summary: Analytics.Summary {
         Analytics.summarize(sessions: sessions, range: range)
@@ -37,7 +38,8 @@ struct TimeSeriesChartCard: View {
             chart.frame(height: 190).clipped()
             RangePillBar(selection: Binding(
                 get: { range }, set: { value in
-                    withAnimation(.easeInOut(duration: 0.2)) { range = value }
+                    if reduceMotion { range = value }
+                    else { withAnimation(.easeInOut(duration: 0.2)) { range = value } }
                 }
             ))
             modeToggle
@@ -60,6 +62,7 @@ struct TimeSeriesChartCard: View {
                 let displayedHours = selectedPoint?.value ?? summary.currentHours
                 Text(Formatters.hoursValue(displayedHours))
                     .typography(.heroNumber).foregroundStyle(Theme.textPrimary)
+                    .lineLimit(1).minimumScaleFactor(0.65)
                 Text(Formatters.hoursUnit(displayedHours)).typography(.body).foregroundStyle(Theme.textSecondary)
             }
             if selectedPoint == nil, range != .all, let delta = summary.deltaHours {
@@ -68,7 +71,19 @@ struct TimeSeriesChartCard: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilitySummary)
+        .accessibilityValue(Formatters.hours(displayedHours))
+    }
+
+    private var displayedHours: Double { selectedPoint?.value ?? summary.currentHours }
+
+    private var accessibilitySummary: String {
+        guard let delta = summary.deltaHours, selectedPoint == nil else {
+            return "\(Formatters.hours(displayedHours)), selected chart point"
+        }
+        guard abs(delta) >= 0.005 else { return "\(Formatters.hours(displayedHours)), unchanged from previous period" }
+        return "\(Formatters.hours(displayedHours)), \(delta > 0 ? "up" : "down") \(Formatters.hours(abs(delta))) versus previous period"
     }
 
     private var chart: some View {
@@ -112,23 +127,32 @@ struct TimeSeriesChartCard: View {
             }
         }
         .chartLegend(.hidden)
+        .accessibilityLabel("\(label) hours chart for \(range.displayName)")
+        .accessibilityValue("\(points.count) data points; current total \(Formatters.hours(summary.currentHours))")
         .chartYScale(domain: 0...yMaximum)
-        .animation(.easeInOut(duration: 0.2), value: range)
-        .animation(.easeInOut(duration: 0.2), value: mode)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: range)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: mode)
     }
 
     private var modeToggle: some View {
         HStack(spacing: Theme.Spacing.xs) {
             Spacer()
             ForEach(ChartMode.allCases, id: \.self) { option in
-                Button { withAnimation(.easeInOut(duration: 0.2)) { mode = option } } label: {
+                Button {
+                    if reduceMotion { mode = option }
+                    else { withAnimation(.easeInOut(duration: 0.2)) { mode = option } }
+                } label: {
                     Text(option.rawValue).foregroundStyle(mode == option ? Theme.accent : Theme.textSecondary)
+                        .frame(minWidth: 72, minHeight: Theme.minimumTapHeight)
+                        .contentShape(Rectangle())
                 }
+                .accessibilityLabel("\(option.rawValue.capitalized) chart")
+                .accessibilityAddTraits(mode == option ? .isSelected : [])
                 .buttonStyle(.plain)
                 if option == .cumulative { Text("|").foregroundStyle(Theme.hairline) }
             }
         }
-        .typography(.caption).accessibilityLabel("Chart mode")
+        .typography(.caption).accessibilityElement(children: .contain).accessibilityLabel("Chart mode")
     }
 
     private func updateSelection(_ date: Date?) {

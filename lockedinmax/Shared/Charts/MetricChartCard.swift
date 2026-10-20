@@ -8,6 +8,7 @@ struct MetricChartCard: View {
     @State private var selectedDate: Date?
     @State private var selectedID: UUID?
     @State private var selectionTick = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var summary: StatsAnalytics.MetricSummary {
         StatsAnalytics.metricSummary(entries: entries, range: range, now: .now)
@@ -16,6 +17,11 @@ struct MetricChartCard: View {
     private var selected: MetricEntry? { points.first { $0.id == selectedID } }
     private var displayed: MetricEntry? { selected ?? summary.latest }
     private var change: Double? { summary.change }
+    private var metricAccessibilitySummary: String {
+        let value = Formatters.metric(displayed?.value ?? 0, unit: metric.unit)
+        guard selected == nil, let change else { return "\(value), selected score" }
+        return "\(value), \(change >= 0 ? "up" : "down") \(Formatters.metricDelta(abs(change))) versus first entry"
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
@@ -26,6 +32,10 @@ struct MetricChartCard: View {
                     Text(Formatters.metricValue(displayed?.value ?? 0)).typography(.heroNumber).foregroundStyle(Theme.textPrimary)
                     if !metric.unit.isEmpty { Text(metric.unit).typography(.body).foregroundStyle(Theme.textSecondary) }
                 }
+                .lineLimit(1).minimumScaleFactor(0.65)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(metricAccessibilitySummary)
+                .accessibilityValue(Formatters.metric(displayed?.value ?? 0, unit: metric.unit))
                 if let displayed {
                     Text(displayed.date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).year()))
                         .typography(.caption).foregroundStyle(Theme.textSecondary)
@@ -35,6 +45,8 @@ struct MetricChartCard: View {
                 }
             }
             chart.frame(height: 210).clipped()
+                .accessibilityLabel("\(metric.name) score chart for \(range.displayName)")
+                .accessibilityValue("\(points.count) entries; latest \(Formatters.metric(displayed?.value ?? 0, unit: metric.unit))")
             RangePillBar(selection: $range)
         }
         .padding(Theme.Spacing.lg).surfaceCard()
@@ -76,6 +88,8 @@ struct MetricChartCard: View {
         }
         .chartYScale(domain: yDomain)
         .chartLegend(.hidden)
+        .accessibilityLabel("\(metric.name) score history")
+        .accessibilityValue("\(points.count) score entries")
         .simultaneousGesture(DragGesture(minimumDistance: 0).onEnded { _ in
             selectedDate = nil
             selectedID = nil

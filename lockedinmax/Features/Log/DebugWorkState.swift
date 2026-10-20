@@ -20,6 +20,27 @@ enum DebugWorkState {
     private static var seeding = false
     private static var timings: SampleLoadTimings?
     private static var refreshVersion = 0
+    private static var runningDebugTask = false
+
+    static var isRunningDebugTask: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return runningDebugTask
+    }
+
+    static func beginDebugTask() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !runningDebugTask else { return false }
+        runningDebugTask = true
+        return true
+    }
+
+    static func finishDebugTask() {
+        lock.lock()
+        runningDebugTask = false
+        lock.unlock()
+    }
 
     static var isSeeding: Bool {
         lock.lock()

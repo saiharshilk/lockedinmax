@@ -25,14 +25,16 @@ struct MarketCloseCard: View {
                 .allowsHitTesting(false)
             VStack(alignment: .leading, spacing: Theme.Spacing.md) {
                 CardHeader(date: data.date)
-                Text("Market Close").font(.system(size: 34, weight: .semibold, design: .serif))
+                Text("Market Close").font(Theme.Fonts.serif(size: 34, relativeTo: .title))
                     .foregroundStyle(Theme.textPrimary).lineLimit(1).minimumScaleFactor(0.7)
+                    .accessibilityAddTraits(.isHeader)
                 Text(data.date.formatted(.dateTime.weekday(.wide).day().month(.wide)).uppercased())
                     .typography(.sectionLabel).foregroundStyle(Theme.textSecondary).lineLimit(1)
                 HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.md) {
-                    Text(Formatters.hours(total)).font(.system(size: 31, weight: .medium, design: .monospaced))
+                    Text(Formatters.hours(total)).font(Theme.Fonts.mono(size: 31, weight: .medium, relativeTo: .largeTitle))
                         .foregroundStyle(Theme.textPrimary).lineLimit(1).minimumScaleFactor(0.65)
-                    DeltaLabel(value: total - previousTotal, text: deltaText).lineLimit(1).minimumScaleFactor(0.6)
+                    DeltaLabel(value: total - previousTotal, text: deltaText,
+                               neutralText: "0.0 hrs").lineLimit(1).minimumScaleFactor(0.6)
                 }
                 VStack(spacing: Theme.Spacing.sm) {
                     ForEach(Array(rows.prefix(5)), id: \.id) { row in positionRow(row) }
@@ -54,15 +56,18 @@ struct MarketCloseCard: View {
             .padding(Theme.Spacing.xl)
         }
         .frame(width: data.format.size.width, height: data.format.size.height).clipped()
+        .accessibilityElement(children: .combine)
     }
 
     private func positionRow(_ row: (id: UUID, name: String, colorHex: String, hours: Double)) -> some View {
         VStack(spacing: Theme.Spacing.xs) {
             HStack(spacing: Theme.Spacing.sm) {
                 Circle().fill(Theme.activityColor(row.colorHex)).frame(width: 7, height: 7)
-                Text(row.name).typography(.caption).foregroundStyle(Theme.textPrimary).lineLimit(1).minimumScaleFactor(0.65)
+                Text(row.name).typography(.caption).foregroundStyle(Theme.textPrimary).lineLimit(1)
+                    .truncationMode(.tail).layoutPriority(0)
                 Spacer(minLength: Theme.Spacing.xs)
                 Text(Formatters.hours(row.hours)).typography(.rowTitle).foregroundStyle(Theme.textPrimary)
+                    .fixedSize().layoutPriority(1)
             }
             GeometryReader { geometry in
                 Capsule().fill(Theme.hairline).overlay(alignment: .leading) {

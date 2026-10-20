@@ -68,31 +68,67 @@ struct CardFooterTicker: View {
             let prior = previousSessions.filter { $0.activityID == activity.activityID }
                 .reduce(0) { $0 + Analytics.boundedHours($1.hours) }
             return (activity.activityName, values.reduce(0) { $0 + Analytics.boundedHours($1.hours) }, prior)
-        }.sorted { $0.hours > $1.hours }.prefix(3).map { $0 }
+        }.sorted { $0.hours > $1.hours }.prefix(4).map { $0 }
+    }
+
+    private var tickerItems: [TickerItem] {
+        let positionItems = activities.map { TickerItem(name: $0.name, value: "\(compactHours($0.hours))h", isActivity: true) }
+        let scoreItems = scores.sorted { $0.date > $1.date }.map {
+            TickerItem(name: $0.metricName, value: Formatters.metricValue($0.value), isActivity: false)
+        }
+        let items = positionItems + scoreItems
+        return Array(items.prefix(4))
+    }
+
+    private func activityForTickerItem(at index: Int) -> (name: String, hours: Double, previous: Double)? {
+        guard tickerItems[index].isActivity else { return nil }
+        let activityIndex = tickerItems.prefix(index).filter(\.isActivity).count
+        return activities.indices.contains(activityIndex) ? activities[activityIndex] : nil
     }
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
-            ForEach(Array(activities.enumerated()), id: \.offset) { _, item in
+            ForEach(Array(tickerItems.enumerated()), id: \.offset) { index, item in
                 HStack(spacing: Theme.Spacing.xs) {
-                    Text(item.name.uppercased()).foregroundStyle(Theme.textSecondary)
-                    Text(item.hours >= item.previous ? "▲" : "▼").foregroundStyle(item.hours >= item.previous ? Theme.up : Theme.down)
-                    Text("\(Formatters.hoursValue(item.hours))h").foregroundStyle(Theme.textPrimary)
+                    Text(activityAbbreviation(item.name)).foregroundStyle(Theme.textSecondary)
+                    if let activity = activityForTickerItem(at: index) {
+                        Text(activity.hours >= activity.previous ? "▲" : "▼")
+                            .foregroundStyle(activity.hours >= activity.previous ? Theme.up : Theme.down)
+                        Text(item.value).foregroundStyle(Theme.textPrimary)
+                    } else {
+                        Text(item.value).foregroundStyle(Theme.textPrimary)
+                    }
                 }
+                .fixedSize()
             }
-            ForEach(scores.sorted { $0.date > $1.date }.prefix(2)) { entry in
-                HStack(spacing: Theme.Spacing.xs) {
-                    Text(entry.metricName.uppercased()).foregroundStyle(Theme.textSecondary)
-                    Text(Formatters.metricValue(entry.value)).foregroundStyle(Theme.textPrimary)
-                }
+            let extraCount = max(0, uniqueActivityCount + scores.count - tickerItems.count)
+            if extraCount > 0 {
+                Text("+\(extraCount)").foregroundStyle(Theme.textSecondary).fixedSize()
             }
         }
-        .typography(.sectionLabel)
-        .lineLimit(1).minimumScaleFactor(0.6)
+        .typography(.caption)
+        .lineLimit(1).minimumScaleFactor(0.7)
+        .accessibilityElement(children: .combine)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, Theme.Spacing.sm)
         .overlay(alignment: .top) { Theme.hairline.frame(height: Theme.borderWidth) }
     }
+
+    private var uniqueActivityCount: Int { Set(sessions.compactMap(\.activityID)).count }
+}
+
+private struct TickerItem {
+    let name: String
+    let value: String
+    let isActivity: Bool
+}
+
+private func activityAbbreviation(_ name: String) -> String {
+    String(name.uppercased().filter(\.isLetter).prefix(4))
+}
+
+private func compactHours(_ value: Double) -> String {
+    Formatters.hoursValue(value)
 }
 
 #if DEBUG

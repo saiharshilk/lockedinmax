@@ -75,6 +75,7 @@ struct MarketCloseCardData {
     let format: RecapCardFormat
 }
 
+@MainActor
 enum RecapCardFactory {
     static func session(_ selected: Session, allSessions: [Session], scores: [MetricEntry],
                         caption: String, format: RecapCardFormat,

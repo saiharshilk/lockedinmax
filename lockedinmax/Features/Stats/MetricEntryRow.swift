@@ -27,5 +27,6 @@ struct MetricEntryRow: View {
         }.padding(.vertical, Theme.Spacing.sm).overlay(alignment: .bottom) {
             Rectangle().fill(Theme.hairline).frame(height: 1)
         }
+        .accessibilityElement(children: .contain)
     }
 }

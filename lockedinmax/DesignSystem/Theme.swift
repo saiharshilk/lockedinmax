@@ -57,6 +57,43 @@ enum Theme {
     static let minimumTapHeight: CGFloat = 44
     static let swatchSize: CGFloat = 40
 
+    enum Fonts {
+        static func mono(size: CGFloat, weight: Font.Weight = .regular, relativeTo style: Font.TextStyle = .body) -> Font {
+#if os(iOS)
+            let postScriptName: String
+            switch weight {
+            case .semibold: postScriptName = "JetBrainsMono-SemiBold"
+            case .medium: postScriptName = "JetBrainsMono-Medium"
+            default: postScriptName = "JetBrainsMono-Regular"
+            }
+            if UIFont(name: postScriptName, size: size) != nil {
+                return .custom(postScriptName, size: size, relativeTo: style)
+            }
+#endif
+            return .system(size: size, weight: weight, design: .monospaced)
+        }
+
+        static func serif(size: CGFloat, relativeTo style: Font.TextStyle = .title) -> Font {
+#if os(iOS)
+            if UIFont(name: "PlayfairDisplay-Regular", size: size) != nil {
+                return .custom("PlayfairDisplay-Regular", size: size, relativeTo: style).weight(.semibold)
+            }
+            if UIFont(name: "PlayfairDisplay-SemiBold", size: size) != nil {
+                return .custom("PlayfairDisplay-SemiBold", size: size, relativeTo: style)
+            }
+#endif
+            return .system(size: size, weight: .semibold, design: .serif)
+        }
+
+        static func isCustomFontAvailable(_ name: String) -> Bool {
+#if os(iOS)
+            return UIFont(name: name, size: 16) != nil
+#else
+            return false
+#endif
+        }
+    }
+
     struct Swatch: Identifiable {
         let name: String
         let hex: String

@@ -19,6 +19,7 @@ struct DebugDataTools: View {
     @State private var selfTestResult: String?
     @State private var sampleCheckResult: String?
     @State private var sweepResult: String?
+    @State private var statsSelfCheckResult: String?
     @State private var lastLoadTimings: SampleLoadTimings?
     @State private var previousAnalytics = Analytics.debugHomeRecomputeCount
     @State private var analyticsRate = 0
@@ -26,13 +27,18 @@ struct DebugDataTools: View {
     @State private var observedSeeding = DebugWorkState.isSeeding
     @State private var observedGeneration = DebugWorkState.generation
     @State private var isRunningChurnTest = false
+    @State private var isRunningDebugTask = false
+    @State private var currentTaskName: String?
     private let diagnosticTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     private var diagnostics: DebugDiagnostics { DebugDiagnostics.shared }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            if isRunningChurnTest {
+            if isRunningDebugTask || DebugWorkState.isRunningDebugTask {
+                Label("Running... \(currentTaskName ?? "")", systemImage: "arrow.triangle.2.circlepath")
+                    .foregroundStyle(Theme.accent).padding(.vertical, Theme.Spacing.md)
+            } else if isRunningChurnTest {
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                     Label("Churn test running...", systemImage: "arrow.triangle.2.circlepath")
                     if let churnTestResult = appState.churnTestResult {
@@ -90,32 +96,39 @@ struct DebugDataTools: View {
             diagnostic("Recap renders since launch", "\(diagnostics.recapRenders)")
             diagnostic("Selected tab changes", "\(diagnostics.tabChanges.count)")
             Button("SELF-TEST RECAP RENDERING") { runSelfTest() }
-                .disabled(isLoadingSamples || isRunningChurnTest)
+                .disabled(isRunningDebugTask || isLoadingSamples || isRunningChurnTest)
                 .foregroundStyle(Theme.accent)
             Button("Churn test") { runChurnTest() }
-                .disabled(isLoadingSamples || isSeeding || isRunningChurnTest)
+                .disabled(isRunningDebugTask || isLoadingSamples || isSeeding || isRunningChurnTest)
                 .foregroundStyle(Theme.accent)
             if !isRunningChurnTest, let churnTestResult = appState.churnTestResult {
                 Text(churnTestResult).foregroundStyle(churnTestResult.hasPrefix("PASS") ? Theme.up : Theme.down)
                     .textSelection(.enabled)
             }
             if let selfTestResult { Text(selfTestResult).foregroundStyle(selfTestResult.hasPrefix("PASS") ? Theme.up : Theme.down) }
-            Button("Check sample generator") { sampleCheckResult = SampleData.runSampleDataSelfCheck() }
-                .disabled(isLoadingSamples || isRunningChurnTest)
+            Button("Check sample generator") { runSynchronousTask("sample check") { sampleCheckResult = SampleData.runSampleDataSelfCheck() } }
+                .disabled(isRunningDebugTask || isLoadingSamples || isRunningChurnTest)
                 .foregroundStyle(Theme.accent)
             if let sampleCheckResult { Text(sampleCheckResult).foregroundStyle(sampleCheckResult.hasPrefix("PASS") ? Theme.up : Theme.down) }
-            Button("Run analytics sweep") { sweepResult = AnalyticsSweep.runAnalyticsSweep().description }
-                .disabled(isLoadingSamples || isRunningChurnTest)
+            Button("Run analytics sweep") { runSynchronousTask("analytics sweep") { sweepResult = AnalyticsSweep.runAnalyticsSweep().description } }
+                .disabled(isRunningDebugTask || isLoadingSamples || isRunningChurnTest)
                 .foregroundStyle(Theme.accent)
             if let sweepResult { Text(sweepResult).foregroundStyle(sweepResult.hasPrefix("PASS") ? Theme.up : Theme.down) }
+            Button("Check stats math") { runStatsSelfCheck() }
+                .disabled(isRunningDebugTask || isLoadingSamples || isRunningChurnTest)
+                .foregroundStyle(Theme.accent)
+            if let statsSelfCheckResult {
+                Text(statsSelfCheckResult).foregroundStyle(statsSelfCheckResult.hasPrefix("PASS") ? Theme.up : Theme.down)
+                    .textSelection(.enabled)
+            }
             if let timings = lastLoadTimings ?? DebugWorkState.lastSampleLoadTimings {
                 diagnostic("Last sample load", timings.description)
             }
             Button("Delete invalid sessions") { deleteInvalidSessions() }
-                .disabled(isLoadingSamples || isRunningChurnTest || !sessions.contains { !$0.hours.isFinite || $0.hours <= 0 })
+                .disabled(isRunningDebugTask || isLoadingSamples || isRunningChurnTest || !sessions.contains { !$0.hours.isFinite || $0.hours <= 0 })
                 .foregroundStyle(Theme.down)
             Button("Clamp over-24 sessions to 24") { clampLongSessions() }
-                .disabled(isLoadingSamples || isRunningChurnTest || !sessions.contains { $0.hours.isFinite && $0.hours > 24 })
+                .disabled(isRunningDebugTask || isLoadingSamples || isRunningChurnTest || !sessions.contains { $0.hours.isFinite && $0.hours > 24 })
                 .foregroundStyle(Theme.down)
             Button {
                 if sessions.isEmpty && entries.isEmpty && activities.isEmpty && metrics.isEmpty { loadSamples(replacing: false) }
@@ -124,9 +137,9 @@ struct DebugDataTools: View {
                 if isLoadingSamples { Label("Loading...", systemImage: "hourglass") }
                 else { Text("Load sample data") }
             }
-            .disabled(isLoadingSamples || isRunningChurnTest)
+            .disabled(isRunningDebugTask || isLoadingSamples || isRunningChurnTest)
             Button("Clear all data", role: .destructive) { confirmingClear = true }
-                .disabled(isLoadingSamples || isRunningChurnTest)
+                .disabled(isRunningDebugTask || isLoadingSamples || isRunningChurnTest)
                 .foregroundStyle(Theme.down)
             eventList(title: "MODEL SAVES", events: diagnostics.saveEvents.map(\.summary))
             eventList(title: "TAB CHANGE STACKS", events: diagnostics.tabChanges.map {
@@ -147,6 +160,23 @@ struct DebugDataTools: View {
         }
     }
 
+    private func runStatsSelfCheck() {
+        runSynchronousTask("stats math") {
+            statsSelfCheckResult = StatsAnalyticsSelfCheck.run()
+        }
+    }
+
+    private func runSynchronousTask(_ name: String, action: () -> Void) {
+        guard DebugWorkState.beginDebugTask() else { return }
+        isRunningDebugTask = true
+        currentTaskName = name
+        if name == "sample check" { selfTestResult = nil }
+        action()
+        currentTaskName = nil
+        isRunningDebugTask = false
+        DebugWorkState.finishDebugTask()
+    }
+
     private func perform(_ action: () throws -> Void) {
         do { try action() } catch { context.rollback(); errorMessage = error.localizedDescription }
     }
@@ -160,7 +190,10 @@ struct DebugDataTools: View {
     }
 
     private func repairData(mode: DebugDataOperations.RepairMode) {
-        guard !isSeeding && !DebugWorkState.isSeeding else { return }
+        guard !isSeeding && !DebugWorkState.isSeeding, DebugWorkState.beginDebugTask() else { return }
+        selfTestResult = nil
+        currentTaskName = "repair"
+        isRunningDebugTask = true
         isSeeding = true
         Task { @MainActor in
             do { try await DebugDataOperations.repairData(in: context, appState: appState, mode: mode) }
@@ -168,11 +201,18 @@ struct DebugDataTools: View {
             isSeeding = false
             observedSeeding = false
             observedGeneration = DebugWorkState.generation
+            currentTaskName = nil
+            isRunningDebugTask = false
+            DebugWorkState.finishDebugTask()
         }
     }
 
     private func loadSamples(replacing: Bool) {
-        guard !isLoadingSamples, !DebugWorkState.isSeeding, !isSeeding else { return }
+        guard !isLoadingSamples, !DebugWorkState.isSeeding, !isSeeding,
+              DebugWorkState.beginDebugTask() else { return }
+        selfTestResult = nil
+        currentTaskName = "sample data"
+        isRunningDebugTask = true
         isLoadingSamples = true
         isSeeding = true
         Task { @MainActor in
@@ -189,10 +229,17 @@ struct DebugDataTools: View {
             observedSeeding = false
             observedGeneration = DebugWorkState.generation
             diagnostics.observe(context)
+            currentTaskName = nil
+            isRunningDebugTask = false
+            DebugWorkState.finishDebugTask()
         }
     }
 
     private func clearAllData() {
+        guard DebugWorkState.beginDebugTask() else { return }
+        selfTestResult = nil
+        currentTaskName = "clear data"
+        isRunningDebugTask = true
         Task { @MainActor in
             isSeeding = true
             do { try await DebugDataOperations.clearData(in: context, appState: appState) }
@@ -201,11 +248,18 @@ struct DebugDataTools: View {
             observedSeeding = false
             observedGeneration = DebugWorkState.generation
             diagnostics.observe(context)
+            currentTaskName = nil
+            isRunningDebugTask = false
+            DebugWorkState.finishDebugTask()
         }
     }
 
     private func runChurnTest() {
-        guard !isLoadingSamples, !DebugWorkState.isSeeding, !isSeeding, !isRunningChurnTest else { return }
+        guard !isLoadingSamples, !DebugWorkState.isSeeding, !isSeeding, !isRunningChurnTest,
+              DebugWorkState.beginDebugTask() else { return }
+        selfTestResult = nil
+        currentTaskName = "churn test"
+        isRunningDebugTask = true
         isRunningChurnTest = true
         isSeeding = true
         Task { @MainActor in
@@ -219,10 +273,17 @@ struct DebugDataTools: View {
             observedSeeding = false
             observedGeneration = DebugWorkState.generation
             diagnostics.observe(context)
+            currentTaskName = nil
+            isRunningDebugTask = false
+            DebugWorkState.finishDebugTask()
         }
     }
 
     private func runSelfTest() {
+        guard DebugWorkState.beginDebugTask() else { return }
+        currentTaskName = "recap self-test"
+        isRunningDebugTask = true
+        selfTestResult = nil
         struct Snapshot {
             let totalHours: Double
             let totalHoursBits: UInt64
@@ -287,8 +348,16 @@ struct DebugDataTools: View {
                         ? "PASS: 20 model-free renders; hours, sessions, tab and saves unchanged"
                         : "FAIL: " + differences.joined(separator: "; ")
                 } catch { selfTestResult = "FAIL: could not re-read sessions: \(error.localizedDescription)" }
+                currentTaskName = nil
+                isRunningDebugTask = false
+                DebugWorkState.finishDebugTask()
             }
-        } catch { selfTestResult = "FAIL: could not read sessions: \(error.localizedDescription)" }
+        } catch {
+            selfTestResult = "FAIL: could not read sessions: \(error.localizedDescription)"
+            currentTaskName = nil
+            isRunningDebugTask = false
+            DebugWorkState.finishDebugTask()
+        }
     }
 
     @MainActor private func render<Card: View>(_ card: Card, format: RecapCardFormat) -> Bool {

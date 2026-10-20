@@ -67,7 +67,8 @@ struct NewActivitySheet: View {
                 .padding(Theme.Spacing.lg)
             }
             .buttonStyle(.plain)
-            .background(Theme.background.ignoresSafeArea())
+            .scrollDismissesKeyboard(.interactively)
+            .background(Theme.background)
             .navigationTitle(existingActivity == nil ? "New Position" : "Edit Position")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
@@ -75,6 +76,8 @@ struct NewActivitySheet: View {
                 get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
             )) { Button("OK", role: .cancel) {} } message: { Text(errorMessage ?? "") }
         }
+        .scrollDismissesKeyboard(.interactively)
+        .toolbar { KeyboardDoneToolbar() }
         .tint(Theme.accent).preferredColorScheme(.dark)
     }
 

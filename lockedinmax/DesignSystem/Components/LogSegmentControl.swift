@@ -22,6 +22,7 @@ struct LogSegmentControl: View {
                             in: RoundedRectangle(cornerRadius: Theme.Radius.small))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(title)
         .accessibilityAddTraits(isScore == score ? .isSelected : [])
     }
 }

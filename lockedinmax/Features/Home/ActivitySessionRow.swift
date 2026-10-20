@@ -32,6 +32,7 @@ struct ActivitySessionRow: View {
             }
         }
         .padding(.vertical, Theme.Spacing.sm)
+        .accessibilityElement(children: .contain)
     }
 }
 

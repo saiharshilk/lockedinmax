@@ -12,21 +12,26 @@ struct NewMetricSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: Theme.Spacing.xl) {
-                TextField("Metric name", text: $name).logInputStyle()
-                TextField("Unit (optional)", text: $unit).logInputStyle()
-                PrimaryButton(title: "CREATE METRIC", action: save)
-                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                Spacer()
+            ScrollView {
+                VStack(spacing: Theme.Spacing.xl) {
+                    TextField("Metric name", text: $name).logInputStyle()
+                    TextField("Unit (optional)", text: $unit).logInputStyle()
+                    PrimaryButton(title: "CREATE METRIC", action: save)
+                        .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    Spacer(minLength: Theme.Spacing.xl)
+                }
+                .padding(Theme.Spacing.lg)
             }
-            .padding(Theme.Spacing.lg)
-            .background(Theme.background.ignoresSafeArea())
+            .scrollDismissesKeyboard(.interactively)
+            .background(Theme.background)
             .navigationTitle("New Metric").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
             .alert("Could not save", isPresented: Binding(
                 get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
             )) { Button("OK", role: .cancel) {} } message: { Text(errorMessage ?? "") }
         }
+        .scrollDismissesKeyboard(.interactively)
+        .toolbar { KeyboardDoneToolbar() }
         .tint(Theme.accent).preferredColorScheme(.dark)
     }
 
