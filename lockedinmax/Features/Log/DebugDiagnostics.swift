@@ -1,5 +1,6 @@
 #if DEBUG
 import Foundation
+import CoreGraphics
 import Observation
 import SwiftData
 
@@ -32,6 +33,8 @@ final class DebugDiagnostics {
     private(set) var homeAnalyticsRecomputes = 0
     private(set) var recapRenders = 0
     private(set) var saveEventCount = 0
+    private(set) var rootViewFrame = CGRect.zero
+    private(set) var tabContainerFrame = CGRect.zero
     private var tokens: [NSObjectProtocol] = []
     private var observedContextID: ObjectIdentifier?
 
@@ -63,6 +66,8 @@ final class DebugDiagnostics {
         print("[Tab] \(from) -> \(to)\n\(frames.joined(separator: "\n"))")
     }
 
+    func recordRootViewFrame(_ frame: CGRect) { rootViewFrame = frame }
+    func recordTabContainerFrame(_ frame: CGRect) { tabContainerFrame = frame }
     func recordHomeAnalytics() { homeAnalyticsRecomputes += 1 }
     func recordRecapRender() { recapRenders += 1 }
 

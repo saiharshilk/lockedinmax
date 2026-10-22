@@ -125,6 +125,7 @@ struct RecentLogs: View {
 
 #Preview {
     List { RecentLogs() }
+        .noScrollEdgeEffect()
         .modelContainer(for: [Activity.self, Session.self, Metric.self, MetricEntry.self], inMemory: true)
         .preferredColorScheme(.dark)
 }

@@ -23,7 +23,8 @@ struct NewMetricSheet: View {
                 .padding(Theme.Spacing.lg)
             }
             .scrollDismissesKeyboard(.interactively)
-            .background(Theme.background)
+            .background(Theme.background.ignoresSafeArea())
+                .noScrollEdgeEffect()
             .navigationTitle("New Metric").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
             .alert("Could not save", isPresented: Binding(

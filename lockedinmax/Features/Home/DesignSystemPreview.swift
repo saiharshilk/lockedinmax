@@ -22,6 +22,7 @@ struct DesignSystemPreview: View {
             .padding(Theme.Spacing.xl)
         }
         .background(Theme.background.ignoresSafeArea())
+            .noScrollEdgeEffect()
         .foregroundStyle(Theme.textPrimary)
         .navigationTitle("lockedinmax")
 #if os(iOS)

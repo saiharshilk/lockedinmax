@@ -104,10 +104,28 @@ enum Theme {
     // Native TabView has no SwiftUI API for the unselected item color.
     static func configureTabBarAppearance() {
 #if os(iOS)
+        if #available(iOS 26.0, *) {
+            let appearance = UITabBarAppearance()
+            appearance.configureWithTransparentBackground()
+            for item in [appearance.stackedLayoutAppearance,
+                         appearance.inlineLayoutAppearance,
+                         appearance.compactInlineLayoutAppearance] {
+                item.normal.iconColor = UIColor(textSecondary)
+                item.normal.titleTextAttributes = [.foregroundColor: UIColor(textSecondary)]
+                item.selected.iconColor = UIColor(accent)
+                item.selected.titleTextAttributes = [.foregroundColor: UIColor(accent)]
+            }
+            UITabBar.appearance().standardAppearance = appearance
+            UITabBar.appearance().scrollEdgeAppearance = appearance
+            UITabBar.appearance().backgroundColor = .clear
+            UITabBar.appearance().unselectedItemTintColor = UIColor(textSecondary)
+            return
+        }
         let appearance = UITabBarAppearance()
         appearance.configureWithOpaqueBackground()
         appearance.backgroundColor = UIColor(background)
         appearance.shadowColor = UIColor(hairline)
+        appearance.backgroundEffect = nil
         for item in [appearance.stackedLayoutAppearance,
                      appearance.inlineLayoutAppearance,
                      appearance.compactInlineLayoutAppearance] {
@@ -118,7 +136,10 @@ enum Theme {
         }
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
+        UITabBar.appearance().backgroundColor = UIColor(background)
+        UITabBar.appearance().barTintColor = UIColor(background)
         UITabBar.appearance().unselectedItemTintColor = UIColor(textSecondary)
+        UITabBar.appearance().isTranslucent = false
 #endif
     }
 

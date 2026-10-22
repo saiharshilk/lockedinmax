@@ -68,7 +68,8 @@ struct NewActivitySheet: View {
             }
             .buttonStyle(.plain)
             .scrollDismissesKeyboard(.interactively)
-            .background(Theme.background)
+            .background(Theme.background.ignoresSafeArea())
+                .noScrollEdgeEffect()
             .navigationTitle(existingActivity == nil ? "New Position" : "Edit Position")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }

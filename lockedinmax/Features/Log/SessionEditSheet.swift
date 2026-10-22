@@ -48,7 +48,8 @@ struct SessionEditSheet: View {
                 }
                 .padding(Theme.Spacing.lg)
             }
-            .background(Theme.background)
+            .background(Theme.background.ignoresSafeArea())
+                .noScrollEdgeEffect()
             .navigationTitle("Edit Session")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }

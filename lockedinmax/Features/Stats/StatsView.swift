@@ -25,7 +25,8 @@ struct StatsView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .tabBarClearance()
-        .background(Theme.background)
+        .background(Theme.background.ignoresSafeArea())
+        .noScrollEdgeEffect()
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(for: StatsDestination.self) { destination in
             switch destination {

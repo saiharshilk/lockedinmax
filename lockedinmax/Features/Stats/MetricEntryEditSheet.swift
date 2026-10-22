@@ -40,7 +40,8 @@ struct MetricEntryEditSheet: View {
                         .disabled(LogInput.positiveNumber(value) == nil || isLoading)
                 }.padding(Theme.Spacing.lg)
             }
-            .background(Theme.background)
+            .background(Theme.background.ignoresSafeArea())
+                .noScrollEdgeEffect()
             .navigationTitle("Edit Score").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
             .alert("Could not save entry", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {

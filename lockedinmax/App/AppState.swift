@@ -30,14 +30,16 @@ final class AppState {
     var logScoreRequested = false
     private(set) var navigationResetVersion = 0
 
-    func prepareForBulkDataChange() {
+    func prepareForBulkDataChange(switchToHome: Bool = false) {
         sessionActivityID = nil
         sessionRecapID = nil
+        guard switchToHome else { return }
         selectedTab = .home
         navigationResetVersion += 1
     }
 
 #if DEBUG
+    private(set) var debugTaskRunner = DebugTaskRunner()
     private(set) var churnTestResult: String?
 
     func setChurnTestResult(_ result: String) {

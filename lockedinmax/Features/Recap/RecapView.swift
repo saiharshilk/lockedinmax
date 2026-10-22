@@ -49,7 +49,8 @@ struct RecapView: View {
             recapContent
 #endif
         }
-        .background(Theme.background)
+        .background(Theme.background.ignoresSafeArea())
+        .noScrollEdgeEffect()
         .tabBarClearance()
         .toolbar(.hidden, for: .navigationBar)
         .onAppear(perform: consumeRoute)
@@ -112,6 +113,7 @@ struct RecapView: View {
             }
             .padding(Theme.Spacing.lg).padding(.bottom, Theme.Spacing.xxl)
         }
+        .noScrollEdgeEffect()
     }
 
     @ViewBuilder private var selectionControls: some View {
@@ -150,6 +152,7 @@ struct RecapView: View {
                 }
             }
         }
+        .noScrollEdgeEffect()
     }
 
     private var captionField: some View {

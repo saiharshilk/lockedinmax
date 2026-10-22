@@ -41,6 +41,7 @@ struct SelectionChips<Item: Identifiable>: View where Item.ID == UUID {
             .typography(.rowTitle)
             .buttonStyle(.plain)
         }
+        .noScrollEdgeEffect()
     }
 }
 

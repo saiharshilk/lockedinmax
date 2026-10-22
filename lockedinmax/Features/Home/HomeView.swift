@@ -28,7 +28,8 @@ struct HomeView: View {
             homeContent
 #endif
         }
-        .background(Theme.background)
+        .background(Theme.background.ignoresSafeArea())
+        .noScrollEdgeEffect()
 #if DEBUG
         .onChange(of: appState.sampleDataRefreshVersion) { _, _ in }
 #endif
@@ -54,6 +55,9 @@ struct HomeView: View {
                     }
             }
             .tint(Theme.accent)
+            .background(Theme.background.ignoresSafeArea())
+            .presentationBackground(Theme.background)
+                .noScrollEdgeEffect()
         }
 #endif
     }
@@ -80,6 +84,7 @@ struct HomeView: View {
             .padding(.bottom, Theme.Spacing.xxl)
         }
         .tabBarClearance()
+            .noScrollEdgeEffect()
     }
 
     private var header: some View {

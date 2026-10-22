@@ -39,7 +39,8 @@ struct LogView: View {
         .listStyle(.plain)
         .tabBarClearance()
         .scrollContentBackground(.hidden)
-        .background(Theme.background)
+        .background(Theme.background.ignoresSafeArea())
+        .noScrollEdgeEffect()
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
@@ -48,6 +49,13 @@ struct LogView: View {
         .onChange(of: appState.logScoreRequested) { _, requested in
             if requested { consumeScoreRequest() }
         }
+#if DEBUG
+        .overlay {
+            if ProcessInfo.processInfo.arguments.contains("--recap-self-test") {
+                DebugDataTools().frame(width: 1, height: 1).hidden()
+            }
+        }
+#endif
     }
 
     private func consumeScoreRequest() {

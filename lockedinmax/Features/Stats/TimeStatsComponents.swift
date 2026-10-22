@@ -94,20 +94,37 @@ struct TimeStatsInsights: View {
     }
 }
 
+enum HeatmapLayout {
+    static let columnCount = 12
+    static let rowCount = 7
+    static let labelColumnWidth: CGFloat = 14
+    static let gap: CGFloat = 3
+    static let fallbackWidth: CGFloat = 300
+
+    static func cellSize(forAvailableWidth width: CGFloat) -> CGFloat {
+        let measuredWidth = width.isFinite && width > 0 ? width : fallbackWidth
+        // One gap separates the label column from the grid; eleven gaps separate its twelve columns.
+        let availableForCells = measuredWidth - labelColumnWidth - 12 * gap
+        return min(28, max(10, availableForCells / CGFloat(columnCount)))
+    }
+
+#if DEBUG
+    static func debugRenderedCellSize(forAvailableWidth width: CGFloat) -> CGFloat {
+        cellSize(forAvailableWidth: width)
+    }
+#endif
+}
+
 struct ConsistencyHeatmap: View {
     let sessions: [Session]
     @State private var selectedDate: Date?
-    private var selected: StatsAnalytics.HeatDay? { days.first { $0.date == selectedDate } }
     @State private var days: [StatsAnalytics.HeatDay] = []
-    @State private var availableWidth: CGFloat = 0
+    @State private var availableWidth = HeatmapLayout.fallbackWidth
+    private var selected: StatsAnalytics.HeatDay? { days.first { $0.date == selectedDate } }
     private var calendar: Calendar { .current }
     private var weekdayLabelSymbols: [String] { HeatmapCalendarLayout.weekdayLabels(calendar: calendar) }
-    private var cellSize: CGFloat {
-        let labelColumn: CGFloat = 20
-        let gaps = Theme.Spacing.xs + 11 * 3
-        let measured = (availableWidth - labelColumn - gaps) / 12
-        return availableWidth > 0 ? min(28, max(10, measured)) : 11
-    }
+    private var cellSize: CGFloat { HeatmapLayout.cellSize(forAvailableWidth: availableWidth) }
+    private var gridHeight: CGFloat { cellSize * 7 + HeatmapLayout.gap * 6 }
 
     init(sessions: [Session]) {
         self.sessions = sessions
@@ -117,38 +134,35 @@ struct ConsistencyHeatmap: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             SectionHeader(title: "CONSISTENCY").accessibilityAddTraits(.isHeader)
             GeometryReader { geometry in
-                HStack(alignment: .top, spacing: Theme.Spacing.xs) {
-                    weekdayLabelView
-                        .frame(width: 20, height: cellSize * 7 + 18, alignment: .top)
-                    ForEach(0..<12, id: \.self) { column in
-                        VStack(spacing: 3) {
-                            ForEach(0..<7, id: \.self) { row in
-                                if let day = dayAt(column: column, row: row) {
-                                    Button { selectedDate = day.date } label: {
-                                        RoundedRectangle(cornerRadius: 3)
-                                            .fill(day.level == 0 ? Theme.surface : Theme.accent.opacity(Double(day.level) * 0.22))
-                                            .overlay(RoundedRectangle(cornerRadius: 3).stroke(Theme.hairline, lineWidth: day.level == 0 ? 1 : 0))
-                                            .frame(width: cellSize, height: cellSize)
-                                            .contentShape(Rectangle())
+                let width = geometry.size.width.isFinite && geometry.size.width > 0
+                    ? geometry.size.width : HeatmapLayout.fallbackWidth
+                let size = HeatmapLayout.cellSize(forAvailableWidth: width)
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    HStack(alignment: .top, spacing: HeatmapLayout.gap) {
+                        weekdayLabelView(cellSize: size)
+                            .frame(width: HeatmapLayout.labelColumnWidth, height: gridHeight, alignment: .top)
+                        HStack(alignment: .top, spacing: HeatmapLayout.gap) {
+                            ForEach(0..<HeatmapLayout.columnCount, id: \.self) { column in
+                                VStack(spacing: HeatmapLayout.gap) {
+                                    ForEach(0..<HeatmapLayout.rowCount, id: \.self) { row in
+                                        cell(column: column, row: row, size: size)
                                     }
-                                    .buttonStyle(.plain)
-                                    .accessibilityLabel("\(StatsFormat.day(day.date)), \(Formatters.hours(day.hours))")
-                                    .accessibilityValue("\(calendar.weekdaySymbols[calendar.component(.weekday, from: day.date) - 1]); select day")
-                                } else {
-                                    Color.clear.frame(width: cellSize, height: cellSize).accessibilityHidden(true)
                                 }
+                                .frame(width: size)
                             }
                         }
-                        .frame(width: cellSize)
                     }
-                    .frame(width: min(geometry.size.width - 20 - Theme.Spacing.xs, 12 * cellSize + 11 * 3), alignment: .leading)
-                    .clipped()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .onAppear { availableWidth = width }
+                    .onChange(of: geometry.size.width) { _, newWidth in
+                        availableWidth = newWidth.isFinite && newWidth > 0
+                            ? newWidth : HeatmapLayout.fallbackWidth
+                    }
+                    legend(size: size)
                 }
-                .onAppear { availableWidth = geometry.size.width }
-                .onChange(of: geometry.size.width) { _, width in availableWidth = width }
             }
-            .frame(maxWidth: .infinity)        .frame(height: cellSize * 7 + 18)
-        .clipped()
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: gridHeight + 34)
             if let selected {
                 Text("\(StatsFormat.day(selected.date)) · \(Formatters.hours(selected.hours))")
                     .typography(.caption).foregroundStyle(Theme.textSecondary)
@@ -164,6 +178,34 @@ struct ConsistencyHeatmap: View {
 #endif
     }
 
+    @ViewBuilder private func cell(column: Int, row: Int, size: CGFloat) -> some View {
+        if let day = dayAt(column: column, row: row) {
+            if day.isFuture {
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Theme.background.opacity(0.35))
+                    .frame(width: size, height: size)
+                    .accessibilityHidden(true)
+            } else {
+                Button { selectedDate = day.date } label: {
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(day.level == 0 ? Theme.surface : Theme.accent.opacity(Double(day.level) / 4))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 3)
+                                .stroke(day.isToday ? Theme.accent : Theme.hairline,
+                                        lineWidth: day.isToday || day.level == 0 ? 1 : 0)
+                        }
+                        .frame(width: size, height: size)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(StatsFormat.day(day.date)), \(Formatters.hours(day.hours))")
+                .accessibilityValue("\(calendar.weekdaySymbols[calendar.component(.weekday, from: day.date) - 1]); select day")
+            }
+        } else {
+            Color.clear.frame(width: size, height: size).accessibilityHidden(true)
+        }
+    }
+
     private func updateDays() {
         days = StatsAnalytics.heatmap(sessions: sessions, today: .now)
         if let selectedDate, !days.contains(where: { $0.date == selectedDate }) {
@@ -171,17 +213,31 @@ struct ConsistencyHeatmap: View {
         }
     }
 
-    private var weekdayLabelView: some View {
-        VStack(spacing: 3) {
+    private func weekdayLabelView(cellSize: CGFloat) -> some View {
+        VStack(spacing: HeatmapLayout.gap) {
             ForEach(Array(weekdayLabelSymbols.enumerated()), id: \.offset) { _, label in
                 Text(label).typography(.caption).foregroundStyle(Theme.textSecondary)
-                    .frame(width: 18, height: cellSize)
+                    .frame(width: HeatmapLayout.labelColumnWidth, height: cellSize)
             }
         }.frame(maxHeight: .infinity, alignment: .top)
     }
 
+    private func legend(size: CGFloat) -> some View {
+        HStack(spacing: Theme.Spacing.xs) {
+            Text("less").typography(.caption).foregroundStyle(Theme.textSecondary)
+            ForEach(1...4, id: \.self) { level in
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Theme.accent.opacity(Double(level) / 4))
+                    .frame(width: min(10, size * 0.45), height: min(10, size * 0.45))
+            }
+            Text("more").typography(.caption).foregroundStyle(Theme.textSecondary)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Less to more time invested")
+    }
+
     private func dayAt(column: Int, row: Int) -> StatsAnalytics.HeatDay? {
-        let index = column * 7 + row
+        let index = column * HeatmapLayout.rowCount + row
         return days.indices.contains(index) ? days[index] : nil
     }
 }

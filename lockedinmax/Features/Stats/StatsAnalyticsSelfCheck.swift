@@ -58,7 +58,8 @@ enum StatsAnalyticsSelfCheck {
               "\(prefix)-first seven weekly buckets do not sum to 4.5h", &failures)
 
         if verifyFullFixtures {
-            check(weekStart == date(11) && matchedPrevious == 2 && week.deltaHours == 2.5 && week.deltaPercent == 125,
+            check(calendar.isDate(weekStart, inSameDayAs: date(11)) && matchedPrevious == 2
+                  && week.deltaHours == 2.5 && week.deltaPercent == 125,
                   "Sunday-first current week should be 4.5h vs 2h (+2.5h, +125%)", &failures)
             check(week.period.bucketDates.count == 7, "Current WEEK should have seven buckets", &failures)
             check(week.activeDays == 2 && week.elapsedDays == 4 && week.averagePerActiveDay == 2.25,
@@ -132,6 +133,19 @@ enum StatsAnalyticsSelfCheck {
         check(saturday?.hours == 2.5 && saturdayPosition?.column == 10
               && saturdayPosition?.row == (saturdayWeekday - calendar.firstWeekday + 7) % 7,
               "\(prefix)-first Oct 10 heatmap cell position/value mismatch", &failures)
+        check(heatmap.count == HeatmapLayout.columnCount * HeatmapLayout.rowCount,
+              "\(prefix)-first heatmap model must contain exactly 12 columns × 7 rows (84 cells)", &failures)
+        check(target?.hours == 3, "\(prefix)-first heatmap Oct 14 cell should contain 3.0h", &failures)
+        let cellSize = HeatmapLayout.debugRenderedCellSize(forAvailableWidth: 375)
+        check(cellSize > 0 && cellSize.isFinite,
+              "\(prefix)-first heatmap rendered cell size must be finite and non-zero", &failures)
+        for width: CGFloat in [375, 402, 440] {
+            let measuredCellSize = HeatmapLayout.debugRenderedCellSize(forAvailableWidth: width)
+            let usedWidth = HeatmapLayout.labelColumnWidth + 12 * HeatmapLayout.gap
+                + CGFloat(HeatmapLayout.columnCount) * measuredCellSize
+            check(measuredCellSize >= 10 && usedWidth <= width,
+                  "\(prefix)-first heatmap exceeds \(Int(width))pt width or cell clamp", &failures)
+        }
         let labels = HeatmapCalendarLayout.weekdayLabels(calendar: calendar)
         for weekday in 1...7 {
             let row = (weekday - calendar.firstWeekday + 7) % 7

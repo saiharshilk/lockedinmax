@@ -21,15 +21,15 @@ enum SampleData {
         let oldEntries = try context.fetch(FetchDescriptor<MetricEntry>())
         let oldActivities = try context.fetch(FetchDescriptor<Activity>())
         let oldMetrics = try context.fetch(FetchDescriptor<Metric>())
-        let hasExistingData = !oldSessions.isEmpty || !oldEntries.isEmpty
-            || !oldActivities.isEmpty || !oldMetrics.isEmpty
-        guard !hasExistingData || replacingExisting else { throw SampleDataError.replacementRequired }
 
         if replacingExisting {
             oldSessions.forEach(context.delete)
             oldEntries.forEach(context.delete)
             oldActivities.forEach(context.delete)
             oldMetrics.forEach(context.delete)
+        } else {
+            assignUniqueNames(to: generated.activities, avoiding: oldActivities.map(\.name))
+            assignUniqueNames(to: generated.metrics, avoiding: oldMetrics.map(\.name))
         }
 
         let activities = generated.activities
@@ -37,6 +37,10 @@ enum SampleData {
         let sessions = generated.sessions
         let entries = generated.entries
         let firstDay = generated.firstDay
+        guard sessions.count == 171, activities.count == 7, metrics.count == 3, entries.count == 75,
+              sessions.allSatisfy({ $0.hours.isFinite && (0.0...24.0).contains($0.hours) }) else {
+            throw SampleDataError.invalidGeneratedData
+        }
         for activity in activities { activity.createdAt = firstDay; context.insert(activity) }
         for metric in metrics { metric.createdAt = firstDay; context.insert(metric) }
         sessions.forEach(context.insert)
@@ -47,7 +51,38 @@ enum SampleData {
         let saveMilliseconds = (ProcessInfo.processInfo.systemUptime - saveStart) * 1_000
         return SampleLoadTimings(generationMilliseconds: generationMilliseconds,
                                  insertionMilliseconds: insertionMilliseconds,
-                                 saveMilliseconds: saveMilliseconds)
+                                 saveMilliseconds: saveMilliseconds,
+                                 sessions: sessions.count, activities: activities.count,
+                                 metrics: metrics.count, entries: entries.count,
+                                 totalSessions: sessions.count, totalActivities: activities.count,
+                                 totalMetrics: metrics.count, totalEntries: entries.count,
+                                 extraSessions: 0, extraActivities: 0, extraMetrics: 0, extraEntries: 0)
+    }
+
+    nonisolated private static func assignUniqueNames<Model>(to models: [Model], avoiding existingNames: [String]) where Model: AnyObject {
+        var usedNames = Set(existingNames.map(normalizedName))
+        for model in models {
+            let name: String
+            if let activity = model as? Activity { name = activity.name }
+            else if let metric = model as? Metric { name = metric.name }
+            else { continue }
+            var candidate = name
+            if usedNames.contains(normalizedName(candidate)) {
+                candidate = "\(name) (Sample)"
+                var suffix = 2
+                while usedNames.contains(normalizedName(candidate)) {
+                    candidate = "\(name) (Sample \(suffix))"
+                    suffix += 1
+                }
+            }
+            usedNames.insert(normalizedName(candidate))
+            if let activity = model as? Activity { activity.name = candidate }
+            else if let metric = model as? Metric { metric.name = candidate }
+        }
+    }
+
+    nonisolated private static func normalizedName(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
     private struct GeneratedSampleData {
@@ -221,7 +256,14 @@ enum SampleData {
     }
 }
 
-enum SampleDataError: Error {
-    case replacementRequired
+enum SampleDataError: LocalizedError {
+    case invalidGeneratedData
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidGeneratedData:
+            "Generated sample data failed count or session-hours validation."
+        }
+    }
 }
 #endif

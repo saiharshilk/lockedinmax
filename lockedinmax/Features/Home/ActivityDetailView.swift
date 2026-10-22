@@ -93,7 +93,8 @@ struct ActivityDetailView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .tabBarClearance()
-        .background(Theme.background)
+        .background(Theme.background.ignoresSafeArea())
+        .noScrollEdgeEffect()
         .listRowSeparator(.hidden)
         .navigationBarBackButtonHidden()
         .toolbar {

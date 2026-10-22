@@ -24,6 +24,7 @@ struct RecapMarketPicker: View {
                     }
                 }
             }
+            .noScrollEdgeEffect()
         }
     }
 }

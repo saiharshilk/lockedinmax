@@ -6,16 +6,29 @@ struct Sparkline: View {
     var size: CGSize = CGSize(width: 64, height: 24)
 
     private var points: [CGPoint] {
-        guard values.count > 1 else {
+        let finiteValues = values.map { $0.isFinite ? max(0, $0) : 0 }
+        guard finiteValues.count > 1 else {
             return [CGPoint(x: 0, y: size.height / 2), CGPoint(x: size.width, y: size.height / 2)]
         }
-        let minimum = min(0, values.min() ?? 0)
-        let maximum = max(minimum + 1, values.max() ?? 1)
-        let range = maximum - minimum
-        return values.enumerated().map { index, value in
-            let x = size.width * CGFloat(index) / CGFloat(values.count - 1)
-            let y = size.height - (CGFloat(value - minimum) / CGFloat(range) * size.height)
+        let maximum = finiteValues.max() ?? 0
+        guard maximum > 0 else {
+            return [CGPoint(x: 0, y: size.height / 2), CGPoint(x: size.width, y: size.height / 2)]
+        }
+        let topInset: CGFloat = 2
+        let bottomInset: CGFloat = 2
+        let plotHeight = max(1, size.height - topInset - bottomInset)
+        let points = finiteValues.enumerated().map { index, value in
+            let x = size.width * CGFloat(index) / CGFloat(finiteValues.count - 1)
+            let y = size.height - bottomInset - CGFloat(value / maximum) * plotHeight
             return CGPoint(x: x, y: y)
+        }
+
+        // A lone active bucket still reads as a time series, not a one-segment slash.
+        guard finiteValues.filter({ $0 > 0 }).count == 1 else { return points }
+        return points.enumerated().map { index, point in
+            CGPoint(x: point.x, y: index == points.count - 1
+                     ? size.height - bottomInset - plotHeight
+                     : size.height - bottomInset)
         }
     }
 

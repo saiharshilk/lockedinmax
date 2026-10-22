@@ -41,29 +41,29 @@ struct HomePositions: View {
                 Circle().fill(Theme.activityColor(position.colorHex)).frame(width: 36, height: 36)
                 Image(systemName: position.iconName).typography(.rowTitle).foregroundStyle(Theme.onAccent)
             }
+            .frame(width: 36, height: 36)
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                 Text(position.name).typography(.rowTitle).foregroundStyle(Theme.textPrimary)
-                    .lineLimit(1).truncationMode(.tail).layoutPriority(1)
+                    .lineLimit(1).truncationMode(.tail)
                 Text(Formatters.hours(position.hours)).typography(.caption).foregroundStyle(Theme.textSecondary)
+                    .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .layoutPriority(1)
             Sparkline(values: downsampled(position.id),
                       color: (position.deltaHours ?? 0) >= 0 ? Theme.up : Theme.down,
                       size: CGSize(width: 56, height: 22))
                 .frame(width: 56, height: 22)
-                .layoutPriority(0)
             VStack(alignment: .trailing, spacing: Theme.Spacing.xs) {
                 if let delta = position.deltaHours {
                     if abs(delta) < 0.005 {
                         Text("0.0 hrs").typography(.caption).foregroundStyle(Theme.textSecondary)
-                            .lineLimit(1).minimumScaleFactor(0.75)
+                            .lineLimit(1).minimumScaleFactor(0.65)
                     } else {
                         Text("\(delta > 0 ? "+" : "−")\(Formatters.hours(abs(delta)))").typography(.caption)
-                            .lineLimit(1).minimumScaleFactor(0.75)
+                            .lineLimit(1).minimumScaleFactor(0.65)
                         if let percent = position.deltaPercent {
                             Text(Formatters.percent(percent)).typography(.caption)
-                                .lineLimit(1).minimumScaleFactor(0.75)
+                                .lineLimit(1).minimumScaleFactor(0.65)
                         }
                     }
                 } else {
@@ -71,15 +71,17 @@ struct HomePositions: View {
                 }
             }
             .frame(width: 96, alignment: .trailing)
-            .layoutPriority(1)
         }
-        .padding(.vertical, Theme.Spacing.md)
+        .frame(minHeight: 56)
+        .padding(.vertical, Theme.Spacing.sm)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(position.name), \(Formatters.hours(position.hours))\(position.deltaHours.map { abs($0) < 0.005 ? ", unchanged" : ", \($0 > 0 ? "up" : "down") \(Formatters.hours(abs($0))) versus previous period" } ?? "")")
     }
 
     private func downsampled(_ id: UUID) -> [Double] {
-        let values = activityBuckets[id, default: []].map(\.value)
+        let rawValues = activityBuckets[id, default: []].map(\.value)
+        guard rawValues.contains(where: { $0 > 0 }) else { return [0, 0] }
+        let values = rawValues
         guard values.count > 14 else { return values }
         return (0..<14).map { index in
             let sourceIndex = index * (values.count - 1) / 13

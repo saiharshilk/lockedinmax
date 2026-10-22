@@ -91,6 +91,8 @@ enum StatsAnalytics {
         let date: Date
         let hours: Double
         let level: Int
+        let isToday: Bool
+        let isFuture: Bool
         var id: Date { date }
     }
 
@@ -238,24 +240,25 @@ enum StatsAnalytics {
         let heatmapEnd = calendar.date(byAdding: .day, value: 1, to: currentWeekEnd) ?? currentWeekEnd
         var totals: [Date: Double] = [:]
         var sessionGuard = LoopGuard("StatsAnalytics.heatmap.sessions")
-        for session in sessions where session.hours.isFinite && session.date >= first && session.date < heatmapEnd {
+        let dayAfterToday = calendar.date(byAdding: .day, value: 1, to: end) ?? end
+        for session in sessions where session.hours.isFinite && session.date >= first
+            && session.date < heatmapEnd && session.date < dayAfterToday {
             guard sessionGuard.next() else { break }
             let day = calendar.startOfDay(for: session.date)
             totals[day, default: 0] += Analytics.boundedHours(session.hours)
         }
-        let values = totals.values.filter { $0.isFinite && $0 > 0 }.sorted()
-        func quantile(_ fraction: Double) -> Double {
-            guard !values.isEmpty else { return .infinity }
-            return values[min(values.count - 1, Int((Double(values.count) * fraction).rounded(.up)) - 1)]
-        }
-        let q1 = quantile(0.25), q2 = quantile(0.5), q3 = quantile(0.75)
+        let maximumHours = totals.values.filter(\.isFinite).max() ?? 0
         var dayGuard = LoopGuard("StatsAnalytics.heatmap.days")
         return (0..<84).compactMap { offset in
             guard dayGuard.next(),
                   let date = calendar.date(byAdding: .day, value: offset, to: first) else { return nil }
-            let hours = totals[date, default: 0]
-            let level = hours <= 0 ? 0 : hours <= q1 ? 1 : hours <= q2 ? 2 : hours <= q3 ? 3 : 4
-            return HeatDay(date: date, hours: hours, level: level)
+            let day = calendar.startOfDay(for: date)
+            let rawHours = totals[day, default: 0]
+            let hours = rawHours.isFinite ? max(0, rawHours) : 0
+            let ratio = maximumHours > 0 && maximumHours.isFinite ? hours / maximumHours : 0
+            let level = hours == 0 ? 0 : min(4, max(1, Int(ceil(ratio * 4))))
+            return HeatDay(date: day, hours: hours, level: level,
+                           isToday: calendar.isDate(day, inSameDayAs: end), isFuture: day > end)
         }
     }
 }

@@ -7,7 +7,17 @@ extension View {
     func tabBarClearance() -> some View {
         safeAreaPadding(.bottom, 96)
     }
+
+    @ViewBuilder
+    func noScrollEdgeEffect() -> some View {
+        if #available(iOS 26.0, *) {
+            scrollEdgeEffectHidden(true, for: .all)
+        } else {
+            self
+        }
+    }
 }
+
 
 struct KeyboardDoneToolbar: ToolbarContent {
     var body: some ToolbarContent {

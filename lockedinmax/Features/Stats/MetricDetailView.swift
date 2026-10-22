@@ -36,7 +36,8 @@ struct MetricDetailView: View {
             else { ContentUnavailableView("Metric deleted", systemImage: "trash").task { dismiss() } }
 #endif
         }
-        .background(Theme.background)
+        .background(Theme.background.ignoresSafeArea())
+        .noScrollEdgeEffect()
         .tabBarClearance()
         .navigationBarBackButtonHidden()
         .toolbar(.visible, for: .navigationBar)
@@ -119,6 +120,7 @@ struct MetricDetailView: View {
             .padding(Theme.Spacing.lg).padding(.bottom, Theme.Spacing.xxl)
         }
         .scrollIndicators(.hidden)
+            .noScrollEdgeEffect()
     }
 
     private var header: some View {
