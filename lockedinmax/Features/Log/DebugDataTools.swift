@@ -21,6 +21,7 @@ struct DebugDataTools: View {
     @State private var sampleCheckResult: String?
     @State private var sweepResult: String?
     @State private var statsSelfCheckResult: String?
+    @State private var recapCardCheckResult: String?
     @State private var lastLoadTimings: SampleLoadTimings?
     @State private var sampleLoadResult: String?
     @State private var previousAnalytics = Analytics.debugHomeRecomputeCount
@@ -146,6 +147,13 @@ struct DebugDataTools: View {
             Button("Check stats math") { runStatsSelfCheck() }
                 .disabled(isRunningDebugTask || isLoadingSamples || isRunningChurnTest)
                 .foregroundStyle(Theme.accent)
+            Button("Check recap cards") { runRecapCardCheck() }
+                .disabled(isRunningDebugTask || isLoadingSamples || isRunningChurnTest)
+                .foregroundStyle(Theme.accent)
+            if let recapCardCheckResult {
+                Text(recapCardCheckResult).foregroundStyle(recapCardCheckResult.hasPrefix("PASS") ? Theme.up : Theme.down)
+                    .textSelection(.enabled)
+            }
             if let statsSelfCheckResult {
                 Text(statsSelfCheckResult).foregroundStyle(statsSelfCheckResult.hasPrefix("PASS") ? Theme.up : Theme.down)
                     .textSelection(.enabled)
@@ -225,6 +233,21 @@ struct DebugDataTools: View {
         runSynchronousTask("stats math") {
             statsSelfCheckResult = StatsAnalyticsSelfCheck.run()
         }
+    }
+
+    private func runRecapCardCheck() {
+        guard DebugWorkState.beginDebugTask() else {
+            appState.debugTaskRunner.report("Skipped: another debug task is running.")
+            return
+        }
+        currentTaskName = "recap card checks"
+        isRunningDebugTask = true
+        defer {
+            currentTaskName = nil
+            isRunningDebugTask = false
+            DebugWorkState.finishDebugTask()
+        }
+        recapCardCheckResult = RecapCardChecks.run()
     }
 
     private func runSynchronousTask(_ name: String, action: () -> Void) {
@@ -398,30 +421,39 @@ struct DebugDataTools: View {
             let priorValue = RecapSessionValue(date: .now.addingTimeInterval(-86_400), hours: 1.5,
                 activityID: activityID, activityName: "Sample Activity",
                 activityColorHex: Theme.activityColorPresets[0])
-            let variants = RecapCardFormat.allCases.flatMap { format in
-                RecapCardBackground.allCases.map { background in
-                    (format: format, background: background, market: false)
+            let variants = RecapMode.allCases.flatMap { mode in
+                RecapCardFormat.allCases.flatMap { format in
+                    let backgrounds: [RecapCardBackground] = mode == .day ? [.dark, .neon] : [.dark, .neon, .photo]
+                    return backgrounds.map { (format: format, background: $0, mode: mode) }
                 }
-            } + RecapCardFormat.allCases.map { format in
-                (format: format, background: RecapCardBackground.dark, market: true)
             }
             var failedRenders = 0
-            for index in 0..<20 {
-                let variant = variants[index % variants.count]
-                if variant.market {
-                    let data = MarketCloseCardData(date: .now, sessions: [sessionValue],
-                        previousDaySessions: [priorValue], scores: [], format: variant.format)
-                    if !render(MarketCloseCard(data: data), format: variant.format) { failedRenders += 1 }
-                } else {
+            for variant in variants {
+                let rendered: Bool
+                switch variant.mode {
+                case .session:
                     let data = SessionRecapCardData(session: sessionValue,
                         activityHistory: [sessionValue, priorValue], allSessions: [sessionValue],
                         daySessions: [sessionValue], previousDaySessions: [priorValue], scores: [],
+                        todayHours: 4, weekHours: 8, streakDays: 2,
                         caption: sessionValue.note, format: variant.format, background: variant.background)
-                    if !render(SessionCard(data: data), format: variant.format) { failedRenders += 1 }
+                    rendered = render(SessionCard(data: data), format: variant.format)
+                case .day:
+                    let data = MarketCloseCardData(date: .now, sessions: [sessionValue],
+                        previousDaySessions: [priorValue], sevenDayHours: [1, 2, 3, 4, 5, 6, 7],
+                        scores: [MarketScoreValue(id: UUID(), name: "Sleep Score", value: 92, change: 4)],
+                        format: variant.format, background: variant.background)
+                    rendered = render(MarketCloseCard(data: data), format: variant.format)
+                case .week:
+                    let data = RecapCardFactory.weekly(.now, sessions: [], scores: [], now: .now,
+                        format: variant.format, background: variant.background)
+                    rendered = render(WeeklyCard(data: data), format: variant.format)
                 }
+                if !rendered { failedRenders += 1 }
             }
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(3))
+                let weeklyRenderFailures = runWeeklySelfTestRenders()
                 do {
                     let end = try snapshot()
                     let differences = [
@@ -429,10 +461,11 @@ struct DebugDataTools: View {
                         start.count == end.count ? nil : "sessions \(start.count) -> \(end.count)",
                         start.tab == end.tab ? nil : "tab \(start.tab) -> \(end.tab)",
                         startSaves == diagnostics.saveEventCount ? nil : "save events \(startSaves) -> \(diagnostics.saveEventCount)",
-                        failedRenders == 0 ? nil : "\(failedRenders) image renders returned nil"
+                        failedRenders == 0 ? nil : "\(failedRenders) image renders returned nil",
+                        weeklyRenderFailures.isEmpty ? nil : weeklyRenderFailures.joined(separator: "; ")
                     ].compactMap { $0 }
                     selfTestResult = differences.isEmpty
-                        ? "PASS: 20 model-free renders; hours, sessions, tab and saves unchanged"
+                        ? "PASS: 20 session/day renders plus 6 weekly renders; hours, sessions, tab and saves unchanged"
                         : "FAIL: " + differences.joined(separator: "; ")
                     NSLog("[RecapSelfTest] %@", selfTestResult ?? "FAIL: missing result")
                 } catch {
@@ -452,9 +485,26 @@ struct DebugDataTools: View {
         }
     }
 
+    @MainActor private func runWeeklySelfTestRenders() -> [String] {
+        var failures: [String] = []
+        for format in RecapCardFormat.allCases {
+            for background in [RecapCardBackground.dark, .neon, .photo] {
+                let data = RecapCardFactory.weekly(.now, sessions: [], scores: [], now: .now,
+                                                   format: format, background: background)
+                if !render(WeeklyCard(data: data), format: format) {
+                    failures.append("weekly \(format.rawValue) \(background.rawValue) render was nil")
+                }
+            }
+        }
+        return failures
+    }
+
     @MainActor private func render<Card: View>(_ card: Card, format: RecapCardFormat) -> Bool {
         diagnostics.recordRecapRender()
-        let renderer = ImageRenderer(content: card)
+        let renderer = ImageRenderer(content: card
+            .environment(\.dynamicTypeSize, .large)
+            .environment(\.colorScheme, .dark)
+            .environment(\.locale, Locale(identifier: "en_US_POSIX")))
         renderer.scale = 3
         renderer.proposedSize = ProposedViewSize(format.size)
         return renderer.uiImage != nil

@@ -13,6 +13,7 @@ enum RecapCardFormat: String, CaseIterable, Identifiable {
 
 enum RecapCardBackground: String, CaseIterable, Identifiable {
     case dark = "DARK"
+    case neon = "NEON"
     case photo = "PHOTO"
     var id: String { rawValue }
 }
@@ -43,15 +44,20 @@ struct SkylineShape: Shape {
 }
 
 struct CardHeader: View {
-    let date: Date
+    let title: String
+
+    init(title: String) { self.title = title }
+
+    init(title: String, date: Date) {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "d MMM"
+        self.title = "\(title) · \(formatter.string(from: date).uppercased())"
+    }
+
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
-            Text("LOCKEDINMAX").typography(.sectionLabel).foregroundStyle(Theme.accent).lineLimit(1).minimumScaleFactor(0.7)
-            Spacer(minLength: Theme.Spacing.xs)
-            Text("MARKET CLOSE · \(date.formatted(.dateTime.day().month(.abbreviated)).uppercased())")
-                .typography(.sectionLabel).foregroundStyle(Theme.textSecondary)
-                .lineLimit(1).minimumScaleFactor(0.65).multilineTextAlignment(.trailing)
-        }
+        Text(title).typography(.sectionLabel).foregroundStyle(Theme.textSecondary)
+            .lineLimit(1).minimumScaleFactor(0.65).frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -61,9 +67,12 @@ struct CardFooterTicker: View {
     let scores: [RecapScoreValue]
 
     private var activities: [(name: String, hours: Double, previous: Double)] {
-        let totals = Dictionary(grouping: sessions.filter { $0.activityID != nil && $0.hours.isFinite },
-                                by: { $0.activityID! })
-        return totals.values.compactMap { values in
+        var grouped: [UUID: [RecapSessionValue]] = [:]
+        for session in sessions where session.hours.isFinite {
+            guard let id = session.activityID else { continue }
+            grouped[id, default: []].append(session)
+        }
+        return grouped.values.compactMap { values in
             guard let activity = values.first else { return nil }
             let prior = previousSessions.filter { $0.activityID == activity.activityID }
                 .reduce(0) { $0 + Analytics.boundedHours($1.hours) }
@@ -89,16 +98,20 @@ struct CardFooterTicker: View {
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
             ForEach(Array(tickerItems.enumerated()), id: \.offset) { index, item in
-                HStack(spacing: Theme.Spacing.xs) {
-                    Text(activityAbbreviation(item.name)).foregroundStyle(Theme.textSecondary)
-                    if let activity = activityForTickerItem(at: index) {
-                        Text(activity.hours >= activity.previous ? "▲" : "▼")
-                            .foregroundStyle(activity.hours >= activity.previous ? Theme.up : Theme.down)
-                        Text(item.value).foregroundStyle(Theme.textPrimary)
+            HStack(spacing: Theme.Spacing.xs) {
+                Text(activityAbbreviation(item.name)).foregroundStyle(Theme.textSecondary)
+                if let activity = activityForTickerItem(at: index) {
+                    if abs(activity.hours - activity.previous) < 0.005 {
+                        Text("0.0 hrs").foregroundStyle(Theme.textSecondary)
                     } else {
+                        Text(activity.hours > activity.previous ? "▲" : "▼")
+                            .foregroundStyle(activity.hours > activity.previous ? Theme.up : Theme.down)
                         Text(item.value).foregroundStyle(Theme.textPrimary)
                     }
+                } else {
+                    Text(item.value).foregroundStyle(Theme.textPrimary)
                 }
+            }
                 .fixedSize()
             }
             let extraCount = max(0, uniqueActivityCount + scores.count - tickerItems.count)
@@ -131,10 +144,42 @@ private func compactHours(_ value: Double) -> String {
     Formatters.hoursValue(value)
 }
 
+struct RecapCardBackdrop: View {
+    let background: RecapCardBackground
+    let format: RecapCardFormat
+    var photo: UIImage? = nil
+
+    var body: some View {
+        Group {
+            if background == .photo, let photo {
+                Image(uiImage: photo).resizable().scaledToFill()
+                    .overlay(LinearGradient(stops: [
+                        .init(color: Theme.background.opacity(0.96), location: 0),
+                        .init(color: Theme.background.opacity(0.55), location: 0.18),
+                        .init(color: Theme.background.opacity(0.3), location: 0.5),
+                        .init(color: Theme.background.opacity(0.62), location: 0.82),
+                        .init(color: Theme.background.opacity(0.98), location: 1)
+                    ], startPoint: .top, endPoint: .bottom))
+            } else if background == .neon {
+                Theme.accent
+                VStack { Spacer(); SkylineShape().fill(Theme.background.opacity(0.12))
+                    .frame(height: format.size.height * 0.26) }
+            } else {
+                Theme.background
+                VStack { Spacer(); SkylineShape().fill(Theme.surface)
+                    .frame(height: format.size.height * 0.26) }
+            }
+        }
+        .frame(width: format.size.width, height: format.size.height)
+        .clipped()
+        .accessibilityHidden(true)
+    }
+}
+
 #if DEBUG
 #Preview("Card pieces") {
     VStack(spacing: Theme.Spacing.lg) {
-        CardHeader(date: .now)
+        CardHeader(title: "MARKET CLOSE", date: .now)
         SkylineShape().fill(Theme.surface).frame(height: 100)
     }.padding().background(Theme.background).preferredColorScheme(.dark)
 }

@@ -99,7 +99,11 @@ struct RootView: View {
             if arguments.contains("--stats-self-check") {
                 appState.selectedTab = .stats
                 NSLog("[StatsSelfCheck] %@", StatsAnalyticsSelfCheck.run())
-            } else if arguments.contains("--recap-self-test") {
+            }
+            if arguments.contains("--check-recap-cards") {
+                NSLog("[RecapCardCheck] %@", RecapCardChecks.run())
+            }
+            if arguments.contains("--recap-self-test") {
                 appState.selectedTab = .log
             }
             if arguments.contains("--churn-test") && !didRunChurnTest {
